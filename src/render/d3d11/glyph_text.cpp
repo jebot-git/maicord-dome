@@ -10,7 +10,7 @@
 #include "maicord/ui/text/ansi_text.hpp"
 #include "maicord/render/effects/colr_paint.hpp"
 #include "maicord/media/image/regional_flag_art.hpp"
-#include "maicord/render/text/native_glyph_outlines.hpp"
+
 #include "maicord/text/fonts/run.hpp"
 #include "maicord/sys/simd.hpp"
 #include "maicord/platform/font/default_fonts.hpp"
@@ -73,6 +73,7 @@ constexpr u16 color_face_flag = 2;
 #if !defined(_WIN32)
 // A colour bitmap face (CBLC/CBDT): its glyphs are decoded images placed in the colour atlas, not paint programs.
 constexpr u16 bitmap_face_flag = 4;
+constexpr u16 monochrome_bitmap_face_flag = 8;
 #endif
 
 // The nearest whole device pixel, also for the negative origins of text
@@ -83,22 +84,11 @@ float whole_pixels(float pixels) noexcept {
     return static_cast<float>(static_cast<float>(truncated) > shifted ? truncated - 1 : truncated);
 }
 
-// The nearest integer (ties to even) in one conversion, for the hot glyph loop.
-inline i32 nearest_i32(float value) noexcept {
-    return _mm_cvtss_si32(_mm_set_ss(value));
-}
-
-// Horizontal pen positions per pixel. Glyphs keep the advances layout used and
-// rasterize at the nearest quarter pixel, as Skia, WebRender and Qt do; a whole
-// pixel per glyph made one gap in a word up to a pixel wider than its neighbours.
-// Baselines stay on whole pixels.
-constexpr i32 kSubpixelShift = 2, kSubpixelBins = 1 << kSubpixelShift;
-
 struct GlyphTextStorage {
     TextGlyph glyphs[kRendererGlyphCapacity];
     TextRun runs[kRendererTextRunCapacity];
     u16 clusters[kRendererGlyphCapacity];
-    GlyphPathCommand path_commands[kRendererPathCapacity];
+
     GlyphAtlasEntry atlas_entries[kRendererAtlasEntryCapacity];
     GlyphAtlasRow atlas_rows[kRendererAtlasRowCapacity];
     GlyphRasterOrigin atlas_origins[kRendererAtlasEntryCapacity];
@@ -177,7 +167,7 @@ bool initialize_storage(D3D11GlyphTextOwner* owner) noexcept {
     owner->glyphs = storage->glyphs;
     owner->runs = storage->runs;
     owner->clusters = storage->clusters;
-    owner->path_commands = storage->path_commands;
+
     owner->atlas_entries = storage->atlas_entries;
     owner->atlas_rows = storage->atlas_rows;
     owner->atlas_origins = storage->atlas_origins;
@@ -237,21 +227,15 @@ u16 retain_run_font(D3D11GlyphTextOwner* owner, const ShapedText& text, const Te
     face.id = static_cast<u16>(owner->font_face_count);
     const auto* font =
         native_font_get(*native_font_session_fonts(owner->system.native_fonts), source->source.face);
-    ConstSlice<u8> colr{};
-    if (font && sfnt_table(font->geometry.face, sfnt_tag('C', 'O', 'L', 'R'), &colr) == SfntStatus::ok &&
-        colr.count)
-        face.flags |= color_face_flag;
-#if !defined(_WIN32)
-    else if (font && font->geometry.kind == FontGeometryKind::bitmap)
-        face.flags |= color_face_flag | bitmap_face_flag;
-#endif
+    if(!font || font->geometry.kind!=FontGeometryKind::bitmap)return 0;
+    face.flags |= color_face_flag | bitmap_face_flag;
+    CbdtFont bitmap{};
+    if(cbdt_open(font->geometry.face,&bitmap)==SfntStatus::ok && bitmap.pixelated)
+        face.flags |= monochrome_bitmap_face_flag;
     return face.id;
 }
 
-bool retained_font_face_is_color(const D3D11GlyphTextOwner* owner, u16 face_id) noexcept {
-    return face_id != 0 && face_id <= owner->font_face_count &&
-           (owner->font_faces[face_id - 1u].flags & color_face_flag) != 0;
-}
+
 
 Color text_style_color(const Theme* theme, const Color& base, u32 flags,
                        const Color* inline_role_color) noexcept {
@@ -460,9 +444,6 @@ bool append_color_glyph_run(D3D11GlyphTextOwner* owner, GpuContext* context,
                             const Color& foreground, float origin_x, float origin_y) noexcept {
     if (!color_owner(owner))
         return false;
-    auto& color = *owner->color;
-    // UI opacity is applied once by the draw shader, including palette colors.
-    const ColrColor text_color{foreground.red, foreground.green, foreground.blue, 1};
     const u16 face_id = retain_run_font(owner, *request.text, run);
     if (!face_id)
         return false;
@@ -475,73 +456,12 @@ bool append_color_glyph_run(D3D11GlyphTextOwner* owner, GpuContext* context,
         u64 key = (1ull << 63) | (static_cast<u64>(face_id) << 48) | (static_cast<u64>(request.dpi) << 32) |
                   (static_cast<u64>(em_fixed) << 16) | glyph.index;
         auto allocation = glyph_atlas_find_indexed(&owner->allocator, atlas_index(owner), key);
-#if defined(_WIN32)
-        if (!allocation.ok()) {
-#else
-        const bool bitmap_face = (owner->font_faces[face_id - 1u].flags & bitmap_face_flag) != 0;
-        if (bitmap_face && !allocation.ok()) {
-            const BitmapGlyph state =
-                build_bitmap_glyph(owner, context, request, run, key, glyph.index, pixels_per_em, &allocation);
-            if (state == BitmapGlyph::absent) {
-                advance += glyph.advance;
-                continue;
-            }
-            if (state != BitmapGlyph::ready)
-                return false;
+        if(!allocation.ok()) {
+            const auto state=build_bitmap_glyph(owner,context,request,run,key,glyph.index,pixels_per_em,&allocation);
+            if(state==BitmapGlyph::absent){advance+=glyph.advance;continue;}
+            if(state!=BitmapGlyph::ready)return false;
         }
-        if (!allocation.ok() && !bitmap_face) {
-#endif
-            const u32 identity = (static_cast<u32>(face_id) << 16) | glyph.index;
-            auto& hint = color.foreground_hints[(glyph.index ^ (face_id * 31u)) & 255u];
-            const u64 base_key = key;
-            if ((hint & 0x7fffffffu) == identity && (hint & 0x80000000u)) {
-                key = hash64_bytes(base_key, &text_color, sizeof(text_color)) | (1ull << 63);
-                allocation = glyph_atlas_find_indexed(&owner->allocator, atlas_index(owner), key);
-            }
-            if (!allocation.ok()) {
-                bool uses_foreground = false;
-                if (!native_color_glyph_build(
-                        &owner->native_outlines, face_id, glyph.index, text_color, pixels_per_em,
-                        &color.program, &uses_foreground, owner->system.native_fonts, run.native_face))
-                    return false;
-                hint = identity | (uses_foreground ? 0x80000000u : 0);
-                if (uses_foreground) {
-                    key = hash64_bytes(base_key, &text_color, sizeof(text_color)) | (1ull << 63);
-                    allocation = glyph_atlas_find_indexed(&owner->allocator, atlas_index(owner), key);
-                }
-            }
-        }
-        GlyphRasterBounds bounds{};
-        if (allocation.ok()) {
-            bounds = cached_bounds(*owner, allocation);
-        } else {
-            if (!color.program.bounds.has_bounds) {
-                advance += glyph.advance;
-                continue;
-            }
-            const auto& extent = color.program.bounds;
-            if (!glyph_raster_bounds(extent.minimum_x, extent.minimum_y, extent.maximum_x, extent.maximum_y,
-                                     pixels_per_em, 1, &bounds))
-                return false;
-            if (!colr_paint_attach_surface(&color.gpu, gpu_context_device(context), owner->allocator))
-                return false;
-            allocation = allocate_glyph(owner, context, key, bounds.width, bounds.height);
-            if (!allocation.ok())
-                return false;
-            if (!colr_paint_rasterize(&color.gpu, context, color.program, bounds, allocation, pixels_per_em,
-                                      owner->allocator.width, owner->allocator.height, owner->allocator.padding,
-                                      owner->color_batch)) {
-                log_u64(LogLevel::error, "render", "colrv1_raster_failed", glyph.index);
-                glyph_atlas_reset(&owner->allocator);
-                return false;
-            }
-            owner->atlas_origins[allocation.handle.slot] = {bounds.left, bounds.top};
-            ++owner->cache_builds;
-            if (allocation.evicted_entries || allocation.atlas_reset) {
-                *request.atlas_invalidated = true;
-                return false;
-            }
-        }
+        const GlyphRasterBounds bounds=cached_bounds(*owner,allocation);
         if (*request.count >= request.capacity)
             return false;
         // Odd bidi levels carry a right-edge origin. Cached outlines/paint
@@ -562,6 +482,19 @@ bool append_color_glyph_run(D3D11GlyphTextOwner* owner, GpuContext* context,
              2.f + static_cast<float>(allocation.x + allocation.width) * texel.u,
              static_cast<float>(allocation.y + allocation.height) * texel.v,
              {1, 1, 1, foreground.alpha}};
+#if !defined(_WIN32)
+        if ((owner->font_faces[face_id-1u].flags & monochrome_bitmap_face_flag)!=0) {
+            q.color=foreground;
+            if(request.theme && glyph.reserved!=kAnsiColorNone) {
+                const auto color=ansi_palette_color(*request.theme,static_cast<u8>(glyph.reserved-1u));
+                q.color={color.red,color.green,color.blue,foreground.alpha};
+            }
+            const float snapped_x=__builtin_elementwise_floor(q.left*pixel_scale+.5f)/pixel_scale;
+            const float snapped_y=__builtin_elementwise_floor(q.top*pixel_scale+.5f)/pixel_scale;
+            q.right+=snapped_x-q.left; q.bottom+=snapped_y-q.top;
+            q.left=snapped_x; q.top=snapped_y;
+        }
+#endif
         advance += glyph.advance;
     }
     return true;
@@ -613,41 +546,10 @@ bool d3d11_glyph_text_append(D3D11GlyphTextOwner* owner, GpuContext* context,
         !request.atlas_invalidated || *request.count > request.capacity) {
         return false;
     }
-    const u32 first_quad = *request.count;
-    bool effect_glyphs = false;
-    const float pixel_scale = static_cast<float>(request.dpi) / 96.0f;
-    const AtlasTexel texel = atlas_texel(*owner);
-    if (!(pixel_scale > 0.0f)) {
-        return false;
-    }
-    // The block moves as one on whole device pixels and each glyph rounds only
-    // its offset inside it. Rounding every glyph's absolute position instead
-    // made the spacing inside a word depend on the block's fractional origin:
-    // centred text at odd window sizes moved some letters a pixel and not
-    // their neighbours.
-    const float origin_x_pixels = whole_pixels(request.origin_x * pixel_scale);
-    const float origin_y_pixels = whole_pixels(request.origin_y * pixel_scale);
-    const float origin_x = origin_x_pixels / pixel_scale, origin_y = origin_y_pixels / pixel_scale;
-    const float inverse_scale = 1.0f / pixel_scale, step_scale = pixel_scale * kSubpixelBins;
-    GlyphAtlasIndex* const index = atlas_index(owner);
-    GlyphOutline outline{};
-    if (!glyph_outline_initialize(&outline,
-                                  Slice<GlyphPathCommand>{owner->path_commands, kRendererPathCapacity})) {
-        return false;
-    }
-    GlyphRasterBatch raster(&owner->gpu, context);
-    struct PendingRaster {
-        GlyphRasterBatch& batch;
-        D3D11GlyphTextOwner& owner;
-        bool& invalidated;
-        ~PendingRaster() noexcept {
-            if (batch.pending()) {
-                batch.cancel();
-                glyph_atlas_reset(&owner.allocator);
-                invalidated = true;
-            }
-        }
-    } pending{raster, *owner, *request.atlas_invalidated};
+    const float pixel_scale=request.dpi/96.f;
+    if(!(pixel_scale>0))return false;
+    const float origin_x=whole_pixels(request.origin_x*pixel_scale)/pixel_scale;
+    const float origin_y=whole_pixels(request.origin_y*pixel_scale)/pixel_scale;
     for (u32 index = 0; index < request.text->decoration_count; ++index) {
         const TextDecoration& decoration = request.text->decorations[index];
         if (decoration.kind != TextDecorationKind::background &&
@@ -681,203 +583,12 @@ bool d3d11_glyph_text_append(D3D11GlyphTextOwner* owner, GpuContext* context,
                 return false;
         }
     }
-    // ansi colours are drawn as authored in every theme; a readability adjustment
-    // would erase a light theme's white-on-black runs.
-    const bool ansi_glyphs = request.theme && !request.cluster_effect &&
-                             ansi_text_tag_glyphs(*request.text, request.source, request.styles);
-    u16 ansi_code = kAnsiColorNone;
-    Color ansi_color{};
-    // The tiles this call met, by atlas key, as the quad's edges in DIPs from the
-    // pen and its texture coordinates.
-    struct GlyphTile {
-        float left, top, right, bottom, u0, v0, u1, v1;
-    };
-    struct RecentGlyph {
-        u64 key;
-        GlyphTile tile;
-    };
-    RecentGlyph recent_glyphs[64];
-    for (RecentGlyph& recent : recent_glyphs)
-        recent.key = 0;
-    for (u32 run_index = 0; run_index < request.text->run_count; ++run_index) {
-        const TextRun& run = request.text->runs[run_index];
-        if ((run.style_flags & text_style_custom_emoji) != 0) {
-            continue;
-        }
-        const u16 face_id = retain_run_font(owner, *request.text, run);
-        if (face_id == 0 || !(run.em_size > 0.0f) || run.em_size > 256.0f) {
-            return false;
-        }
-        const u32 em_fixed = static_cast<u32>(run.em_size * 64.0f + 0.5f);
-        // Atlas key: face, DPI (14 bits) above the subpixel bin, em size and glyph. The
-        // bin sits in bits 32-33, which the atlas index hash spreads across its buckets.
-        if (em_fixed == 0 || em_fixed > 0xFFFFu || request.dpi > 0x3FFFu) {
-            return false;
-        }
-        const u64 run_key = (static_cast<u64>(face_id) << 48) |
-                            (static_cast<u64>(request.dpi) << (32 + kSubpixelShift)) |
-                            (static_cast<u64>(em_fixed) << 16);
-        Color foreground =
-            text_style_color(request.theme, request.color, run.style_flags, request.inline_role_color);
-        Color role_color{};
-        if (role_color_for_run(request, run, &role_color)) {
-            foreground = role_color;
-        }
-        if (retained_font_face_is_color(owner, face_id)) {
-            if (!raster.finish())
-                return false;
-            if (!append_color_glyph_run(owner, context, request, run, foreground, origin_x, origin_y))
-                return false;
-            continue;
-        }
-        const float pixels_per_em = run.em_size * pixel_scale;
-        float advance = 0.0f;
-        const float baseline_y_pixels = origin_y_pixels + whole_pixels(run.baseline_y * pixel_scale);
-        for (u32 offset = 0; offset < run.glyph_count; ++offset) {
-            const u32 glyph_index = run.first_glyph + offset;
-            if (glyph_index >= request.text->glyph_count) {
-                return false;
-            }
-            const TextGlyph& glyph = request.text->glyphs[glyph_index];
-            auto& face_cache = owner->font_faces[face_id - 1u];
-            if (face_cache.empty_glyph_plus_one == static_cast<u32>(glyph.index) + 1u) {
-                advance += glyph.advance;
-                continue;
-            }
-            const float offset_x = (run.bidi_level & 1)
-                                       ? run.baseline_x - (advance + glyph.advance + glyph.advance_offset)
-                                       : run.baseline_x + advance + glyph.advance_offset;
-            // The pen inside the block in quarter pixels: whole pixels (floored, also
-            // for negative offsets) and the bin, the atlas tile's subpixel offset.
-            const i32 steps = nearest_i32(offset_x * step_scale);
-            const i32 whole = steps >> kSubpixelShift;
-            const u32 bin = static_cast<u32>(steps & (kSubpixelBins - 1));
-            const float pen_offset = static_cast<float>(bin) / kSubpixelBins;
-            const u64 key = run_key | (static_cast<u64>(bin) << 32) | glyph.index;
-            // Glyphs repeat within a block: a tile met earlier in this call needs no atlas lookup (only an
-            // eviction or a reset changes a tile, and either ends the call).
-            RecentGlyph& recent = recent_glyphs[(key * 0x9E3779B97F4A7C15ull) >> 58];
-            if (recent.key != key) {
-                auto allocation = glyph_atlas_find_indexed(&owner->allocator, index, key);
-                GlyphRasterBounds bounds{};
-                if (allocation.ok()) {
-                    bounds = cached_bounds(*owner, allocation);
-                } else {
-                    // Origin and dimensions are needed on a hit; the outline is only
-                    // needed to populate a missing atlas tile. Origins share the same
-                    // slots for monochrome and color glyphs and are rewritten on reuse.
-                    glyph_outline_reset(&outline);
-                    if (!native_glyph_outline(&owner->native_outlines, face_id, glyph.index, &outline,
-                                              owner->system.native_fonts, run.native_face))
-                        return false;
-                    if (!outline.has_bounds || outline.count == 0) {
-                        face_cache.empty_glyph_plus_one = static_cast<u32>(glyph.index) + 1u;
-                        advance += glyph.advance;
-                        continue;
-                    }
-                    const float shift = pen_offset / pixels_per_em;
-                    if (!glyph_raster_bounds(outline.minimum_x + shift, outline.minimum_y, outline.maximum_x + shift,
-                                             outline.maximum_y, pixels_per_em, 1, &bounds)) {
-                        return false;
-                    }
-                    allocation = allocate_glyph(owner, context, key, bounds.width, bounds.height);
-                    if (!allocation.ok()) {
-                        log_u64(LogLevel::error, "render", "glyph_allocation_error",
-                                static_cast<u64>(allocation.error));
-                        return false;
-                    }
-                    if (!allocation.cached) {
-                        const GlyphAtlasGpuResult rasterized = raster.add(
-                            outline, bounds, allocation, pixels_per_em, owner->allocator.padding, 0, pen_offset);
-                        if (!rasterized.ok()) {
-                            raster.cancel();
-                            glyph_atlas_reset(&owner->allocator);
-                            *request.atlas_invalidated = true;
-                            return false;
-                        }
-                        ++owner->cache_builds;
-                    }
-                    owner->atlas_origins[allocation.handle.slot] = {bounds.left, bounds.top};
-                    if (allocation.evicted_entries || allocation.atlas_reset) {
-                        // A retry may reuse these entries, so submit every pending tile first.
-                        if (!raster.finish())
-                            glyph_atlas_reset(&owner->allocator);
-                        *request.atlas_invalidated = true;
-                        return false;
-                    }
-                }
-                recent.key = key;
-                recent.tile = {static_cast<float>(bounds.left) * inverse_scale,
-                               static_cast<float>(bounds.top) * inverse_scale,
-                               static_cast<float>(bounds.right) * inverse_scale,
-                               static_cast<float>(bounds.bottom) * inverse_scale,
-                               static_cast<float>(allocation.x) * texel.u,
-                               static_cast<float>(allocation.y) * texel.v,
-                               static_cast<float>(allocation.x + allocation.width) * texel.u,
-                               static_cast<float>(allocation.y + allocation.height) * texel.v};
-            }
-            if (*request.count >= request.capacity) {
-                return false;
-            }
-            const GlyphTile& tile = recent.tile;
-            const float baseline_x = (origin_x_pixels + static_cast<float>(whole)) * inverse_scale;
-            const float baseline_y = baseline_y_pixels * inverse_scale - glyph.ascender_offset;
-            GlyphQuad& quad = request.output[(*request.count)++];
-            quad.left = baseline_x + tile.left;
-            quad.top = baseline_y + tile.top;
-            quad.right = baseline_x + tile.right;
-            quad.bottom = baseline_y + tile.bottom;
-            quad.u0 = tile.u0;
-            quad.v0 = tile.v0;
-            quad.u1 = tile.u1;
-            quad.v1 = tile.v1;
-            quad.color = foreground;
-            if (ansi_glyphs && glyph.reserved != kAnsiColorNone) {
-                if (glyph.reserved != ansi_code) {
-                    ansi_code = glyph.reserved;
-                    ansi_color = ansi_palette_color(*request.theme, static_cast<u8>(ansi_code - 1u));
-                }
-                quad.color = Color{ansi_color.red, ansi_color.green, ansi_color.blue, foreground.alpha};
-            }
-            // Filled with the final ordinal after all glyphs/fonts are ready.
-            if (request.cluster_effect) {
-                copy_bytes(&quad.color.green, &glyph_index, sizeof(glyph_index));
-                effect_glyphs = true;
-            }
-            advance += glyph.advance;
-        }
-    }
-    if (!raster.finish())
-        return false;
-    if (effect_glyphs) {
-        struct EffectContext {
-            D3D11GlyphTextOwner* owner;
-            const ShapedText* text;
-        } effect{owner, request.text};
-        const auto colored = +[](void* opaque, u32 glyph) noexcept {
-            auto& state = *static_cast<EffectContext*>(opaque);
-            for (u32 i = 0; i < state.text->run_count; ++i) {
-                const auto& run = state.text->runs[i];
-                if (glyph >= run.first_glyph && glyph - run.first_glyph < run.glyph_count)
-                    return retained_font_face_is_color(state.owner,
-                                                       retain_run_font(state.owner, *state.text, run));
-            }
-            return false;
-        };
-        // Shaper output always satisfies the preparation limits: its glyph and
-        // cluster counts are bounded by the renderer's storage capacities,
-        // which stay below the 16-bit ordinal range.
-        if (!glyph_effect_prepare(*request.text, request.source, colored, &effect))
-            return false;
-        for (u32 i = first_quad; i < *request.count; ++i) {
-            auto& quad = request.output[i];
-            // Decorations have negative u; color atlas tiles start at u=2.
-            if (quad.u0 < 0 || quad.u0 >= 2)
-                continue;
-            u32 glyph = 0;
-            copy_bytes(&glyph, &quad.color.green, sizeof(glyph));
-            quad.color.green = static_cast<float>(request.text->glyphs[glyph].reserved);
-        }
+    if(request.theme)ansi_text_tag_glyphs(*request.text,request.source,request.styles);
+    for(u32 i=0;i<request.text->run_count;++i) {
+        const auto& run=request.text->runs[i];
+        Color foreground=text_style_color(request.theme,request.color,run.style_flags,request.inline_role_color);
+        Color role{};if(role_color_for_run(request,run,&role))foreground=role;
+        if(!append_color_glyph_run(owner,context,request,run,foreground,origin_x,origin_y))return false;
     }
     for (u32 index = 0; index < request.text->decoration_count; ++index) {
         const TextDecoration& decoration = request.text->decorations[index];
@@ -977,7 +688,6 @@ D3D11GlyphTextInitializeResult d3d11_glyph_text_initialize(D3D11GlyphTextOwner* 
         return initialize_result(D3D11GlyphTextInitializeError::atlas_storage, E_INVALIDARG);
     }
     const bool adopt = prestarted_atlas && prestarted_atlas->surface && prestarted_atlas->texture_view &&
-                       prestarted_atlas->command_view && prestarted_atlas->raster_shader &&
                        prestarted_atlas->width == owner->allocator.width &&
                        prestarted_atlas->height == owner->allocator.height &&
                        prestarted_atlas->command_capacity == kRendererPathCapacity;
@@ -1088,10 +798,9 @@ void d3d11_glyph_text_release(D3D11GlyphTextOwner* owner) noexcept {
     if (owner->color_batch)
         owner->color_batch->reset();
     owner->color_batch = nullptr;
-    native_glyph_outlines_release(&owner->native_outlines);
+
     if (owner->color) {
         colr_paint_gpu_release(&owner->color->gpu);
-        arena_release(&owner->color->program.storage);
         pages_release(owner->color);
         owner->color = nullptr;
     }

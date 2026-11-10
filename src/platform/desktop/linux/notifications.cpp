@@ -195,7 +195,7 @@ DesktopNotificationShowResult desktop_notifications_show_once(DesktopNotificatio
     request.body = payload.body.bytes ? body : nullptr;
     request.icon = has_icon ? icon : nullptr;
     request.category = "im.received";
-    request.desktop_entry = "io.github.maj113.MaiCord";
+    request.desktop_entry = "org.domed.Discord";
     request.default_action = true;
     request.timeout_ms = -1;
     // The Windows "suppress popup" files the toast without a banner; a low urgency is the nearest request there is.

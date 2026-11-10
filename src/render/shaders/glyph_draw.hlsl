@@ -175,7 +175,8 @@ float3 toon_color(TextEffectMaterial effect,float t) {
     return lerp(a,b,blend);
 }
 float4 glyph_pixel(GlyphVertexOutput input) : SV_Target0 {
-    if(input.texture_bounds.x>=2)return color_glyph_atlas.SampleLevel(glyph_sampler,input.texture_coordinate,0)*input.color.a;
+    // Bitmap masks use the quad's text color. Actual color emoji submit white tint.
+    if(input.texture_bounds.x>=2)return color_glyph_atlas.SampleLevel(glyph_sampler,input.texture_coordinate,0)*float4(input.color.rgb,1)*input.color.a;
     float coverage=1;
     if(input.texture_coordinate.x<=-2) {
         float2 local=float2(input.texture_coordinate.x+3,input.texture_coordinate.y)-.5;

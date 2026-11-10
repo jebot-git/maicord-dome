@@ -1,3 +1,7 @@
+#if !defined(_WIN32)
+#include "maicord/sys/linux/process.hpp"
+#include "../settings/custom_theme.hpp"
+#endif
 // The portable half of the window procedure: every window event of the main window, in the order the overlays and the
 // shell take it (window_runtime.hpp). The Windows-only half (state observer, caption frame, UI Automation, shell
 // integration) lives in window_runtime.cpp.
@@ -383,6 +387,10 @@ bool chain(const WindowEvent& event, WindowEventResult* answer) noexcept {
     }
     switch (type) {
     case EventType::settings_changed:
+#if !defined(_WIN32)
+        if (environment_get("DOMECORD_SESSION"))
+            application_theme_accessibility_refresh();
+#endif
         application_surface_motion_refresh_system_preference();
         // Windows' app mode switched between light and dark: an effect's appearance input glides to it.
         if (event.settings.areas & settings_scheme)

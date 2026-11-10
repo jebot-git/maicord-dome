@@ -1,0 +1,826 @@
+{
+  "active_workspace": 0,
+  "config": {
+    "anchor_mode": "room",
+    "bar_distance_m": 0.6000000238418579,
+    "center_m": [
+      0.0,
+      1.399999976158142,
+      0.0
+    ],
+    "desktop_backdrop": true,
+    "displays": [],
+    "dome_upper_tilt_deg": 8.0,
+    "dome_vertical_span_deg": 110.0,
+    "gpu_device": null,
+    "keybindings": [
+      {
+        "command": "LookingGlassOverview",
+        "enabled": true,
+        "id": "looking-glass-overview",
+        "key": 103,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Close",
+        "enabled": true,
+        "key": 119,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Screenshot",
+        "enabled": true,
+        "key": 65377,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": false,
+          "shift": false
+        }
+      },
+      {
+        "command": "Menu",
+        "enabled": true,
+        "key": 65479,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "PullOut",
+        "enabled": true,
+        "key": 112,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "SendToOtherRealm",
+        "enabled": true,
+        "key": 120,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": "SwitchInputRealm",
+        "enabled": true,
+        "key": 120,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "Cycle": false
+        },
+        "enabled": true,
+        "key": 65289,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": false,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "Cycle": true
+        },
+        "enabled": true,
+        "key": 65289,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": false,
+          "shift": true
+        }
+      },
+      {
+        "command": "ToggleXrBars",
+        "enabled": true,
+        "key": 98,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": "ToggleXrDesktop",
+        "enabled": true,
+        "key": 100,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": "ToggleXrTop",
+        "enabled": true,
+        "key": 116,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "ToggleXrBottom",
+        "enabled": true,
+        "key": 98,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "AnchorHere",
+        "enabled": true,
+        "key": 114,
+        "mods": {
+          "alt": false,
+          "ctrl": true,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Launch",
+        "enabled": true,
+        "key": 32,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": "HideOthers",
+        "enabled": true,
+        "key": 104,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "NewWorkspace",
+        "enabled": true,
+        "key": 110,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": "ResetSpatial",
+        "enabled": true,
+        "key": 114,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": "XrSettings",
+        "enabled": true,
+        "key": 44,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "FileManager",
+        "enabled": true,
+        "key": 101,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Terminal",
+        "enabled": true,
+        "key": 116,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "HideApp",
+        "enabled": true,
+        "key": 104,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "QuitApp",
+        "enabled": true,
+        "key": 113,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Minimize",
+        "enabled": true,
+        "key": 109,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Copy",
+        "enabled": true,
+        "key": 99,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Paste",
+        "enabled": true,
+        "key": 118,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "SelectAll",
+        "enabled": true,
+        "key": 97,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "Scale": 1.100000023841858
+        },
+        "enabled": true,
+        "key": 61,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "Scale": 0.9090908765792847
+        },
+        "enabled": true,
+        "key": 45,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": "Maximize",
+        "enabled": true,
+        "key": 65293,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "CycleWorkspace": -1
+        },
+        "enabled": true,
+        "key": 65361,
+        "mods": {
+          "alt": false,
+          "ctrl": true,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "CycleWorkspace": 1
+        },
+        "enabled": true,
+        "key": 65363,
+        "mods": {
+          "alt": false,
+          "ctrl": true,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "Workspace": 0
+        },
+        "enabled": true,
+        "key": 49,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 0
+        },
+        "enabled": true,
+        "key": 49,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 1
+        },
+        "enabled": true,
+        "key": 50,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 1
+        },
+        "enabled": true,
+        "key": 50,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 2
+        },
+        "enabled": true,
+        "key": 51,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 2
+        },
+        "enabled": true,
+        "key": 51,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 3
+        },
+        "enabled": true,
+        "key": 52,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 3
+        },
+        "enabled": true,
+        "key": 52,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 4
+        },
+        "enabled": true,
+        "key": 53,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 4
+        },
+        "enabled": true,
+        "key": 53,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 5
+        },
+        "enabled": true,
+        "key": 54,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 5
+        },
+        "enabled": true,
+        "key": 54,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 6
+        },
+        "enabled": true,
+        "key": 55,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 6
+        },
+        "enabled": true,
+        "key": 55,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "Workspace": 7
+        },
+        "enabled": true,
+        "key": 56,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveWorkspace": 7
+        },
+        "enabled": true,
+        "key": 56,
+        "mods": {
+          "alt": false,
+          "ctrl": false,
+          "logo": true,
+          "shift": true
+        }
+      },
+      {
+        "command": {
+          "MoveLane": -1
+        },
+        "enabled": true,
+        "id": "window-lane-up",
+        "key": 65362,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveLane": 1
+        },
+        "enabled": true,
+        "id": "window-lane-down",
+        "key": 65364,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveHorizontal": 1
+        },
+        "enabled": true,
+        "id": "window-right",
+        "key": 65363,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "MoveHorizontal": -1
+        },
+        "enabled": true,
+        "id": "window-left",
+        "key": 65361,
+        "mods": {
+          "alt": true,
+          "ctrl": false,
+          "logo": true,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "CycleLane": -1
+        },
+        "enabled": true,
+        "id": "focus-lane-up",
+        "key": 65362,
+        "mods": {
+          "alt": true,
+          "ctrl": true,
+          "logo": false,
+          "shift": false
+        }
+      },
+      {
+        "command": {
+          "CycleLane": 1
+        },
+        "enabled": true,
+        "id": "focus-lane-down",
+        "key": 65364,
+        "mods": {
+          "alt": true,
+          "ctrl": true,
+          "logo": false,
+          "shift": false
+        }
+      }
+    ],
+    "lane_gap_deg": 2.0,
+    "projection": "room_dome",
+    "pullout_distance_m": 2.0,
+    "radius_m": 2.200000047683716,
+    "taskbar_height_deg": 7.0,
+    "upper_bar_height_deg": 5.0,
+    "vertical_fov_deg": 100.0,
+    "wayvr_controller_mouse": false,
+    "window_border_px": 1,
+    "window_gap_deg": 0.5,
+    "window_gap_px": 8.0,
+    "xr_backdrop": "precipice",
+    "xr_backdrop_sound": true,
+    "xr_backdrop_volume": 1.0,
+    "xr_backdrop_yaw_deg": 0.0,
+    "xr_render_scale": 1.5,
+    "xr_window_resolution": "1080p",
+    "yaw_deg": 0.0
+  },
+  "focused": 1,
+  "locked": false,
+  "looking_glass": {
+    "cards": {},
+    "enabled": false,
+    "focus_candidate": null,
+    "settle_at_ms": null
+  },
+  "popups": [],
+  "presentation": {
+    "bottom": true,
+    "desktop": true,
+    "top": true
+  },
+  "pullout_anchor": null,
+  "revision": 3,
+  "source": "wayland",
+  "view_pose": {
+    "orientation_xyzw": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "position_m": [
+      0.0,
+      1.399999976158142,
+      0.0
+    ]
+  },
+  "windows": [
+    {
+      "app_id": "org.domed.Discord",
+      "client_pid": 871639,
+      "desktop": {
+        "h": 460.0,
+        "w": 720.0,
+        "x": 100.0,
+        "y": 80.0
+      },
+      "desktop_visible": true,
+      "dome_offset_deg": [
+        0.0,
+        0.0
+      ],
+      "id": 1,
+      "lane": 1,
+      "maximized": false,
+      "minimized": false,
+      "origin": "desktop",
+      "pullout_restore_scale": null,
+      "pullout_slot": null,
+      "restore": null,
+      "stereo": "mono",
+      "title": "DomeD Discord",
+      "workspace": 0,
+      "xr_fullscreen_anchor": null,
+      "xr_pose": null,
+      "xr_scale": 1.0,
+      "xr_visible": true
+    }
+  ],
+  "workspaces": [
+    {
+      "lanes": [
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        },
+        {
+          "rotation_deg": 0.0,
+          "windows": [
+            1
+          ]
+        },
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        }
+      ],
+      "name": "Studio",
+      "shares": [
+        0.23000000417232513,
+        0.5400000214576721,
+        0.23000000417232513
+      ]
+    },
+    {
+      "lanes": [
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        },
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        },
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        }
+      ],
+      "name": "Research",
+      "shares": [
+        0.23000000417232513,
+        0.5400000214576721,
+        0.23000000417232513
+      ]
+    },
+    {
+      "lanes": [
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        },
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        },
+        {
+          "rotation_deg": 0.0,
+          "windows": []
+        }
+      ],
+      "name": "Quiet",
+      "shares": [
+        0.23000000417232513,
+        0.5400000214576721,
+        0.23000000417232513
+      ]
+    }
+  ]
+}

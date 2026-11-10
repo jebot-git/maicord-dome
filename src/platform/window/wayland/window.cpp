@@ -91,6 +91,12 @@ void on_global(void*, wl_registry* registry, u32 name, const char* interface, u3
         if (!g.cursor_shape_manager)
             g.cursor_shape_manager = static_cast<wp_cursor_shape_manager_v1*>(
                 wl_registry_bind(registry, name, &wp_cursor_shape_manager_v1_interface, 1));
+    } else if (c_string_equal(interface,"org_kde_kwin_appmenu_manager")) {
+        if(!g.application_menu_manager) {
+            g.application_menu_version=minimum(version,2u);
+            g.application_menu_manager=static_cast<org_kde_kwin_appmenu_manager*>(
+                wl_registry_bind(registry,name,&org_kde_kwin_appmenu_manager_interface,g.application_menu_version));
+        }
     } else if (c_string_equal(interface, "zxdg_decoration_manager_v1")) {
         if (!g.decoration_manager)
             g.decoration_manager = static_cast<zxdg_decoration_manager_v1*>(
@@ -330,6 +336,7 @@ void destroy_window_objects() noexcept {
         wp_fractional_scale_v1_destroy(window.fractional);
     if (window.viewport)
         wp_viewport_destroy(window.viewport);
+    if(window.application_menu)org_kde_kwin_appmenu_release(window.application_menu);
     if (window.decoration)
         zxdg_toplevel_decoration_v1_destroy(window.decoration);
     if (window.toplevel)
@@ -372,6 +379,10 @@ void disconnect() noexcept {
             wl_seat_release(g.seat);
         else
             g_client.proxy_destroy(reinterpret_cast<Proxy*>(g.seat));
+    }
+    if(g.application_menu_manager) {
+        if(g.application_menu_version>=2)org_kde_kwin_appmenu_manager_release(g.application_menu_manager);
+        else g_client.proxy_destroy(reinterpret_cast<Proxy*>(g.application_menu_manager));
     }
     if (g.decoration_manager)
         zxdg_decoration_manager_v1_destroy(g.decoration_manager);
@@ -718,7 +729,7 @@ bool window_create(const WindowCreateInfo& info, WindowSink sink, void* context,
     if (g.decoration_manager) {
         window.decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(g.decoration_manager, window.toplevel);
         zxdg_toplevel_decoration_v1_add_listener(window.decoration, &kDecorationListener, nullptr);
-        zxdg_toplevel_decoration_v1_set_mode(window.decoration, zxdg_toplevel_decoration_v1_mode_client_side);
+        zxdg_toplevel_decoration_v1_set_mode(window.decoration, zxdg_toplevel_decoration_v1_mode_server_side);
     }
     if (g.viewporter) {
         window.viewport = wp_viewporter_get_viewport(g.viewporter, window.surface);

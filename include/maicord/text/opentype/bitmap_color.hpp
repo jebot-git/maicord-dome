@@ -20,6 +20,7 @@ struct CbdtFont {
     ConstSlice<u8> locations; // CBLC
     ConstSlice<u8> data;      // CBDT
     u32 strike_count;
+    bool pixelated; // DomeD monochrome BDF strikes: nearest-neighbour sampling, no outline rasterization.
 };
 
 // One strike (a BitmapSize record of CBLC).

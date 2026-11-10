@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "app_id": "org.domed.Discord",
+  "bitmap_fonts": [
+    {
+      "family": "DomeD Bitmap",
+      "source": "/usr/local/share/fonts/domed/akahuku--ufo/build/ufo.bdf",
+      "source_sha256": "acb7781a8f33712e7fdb5ca51ba651e07d12c319aa82fddbd9bad87ee30fce0d",
+      "glyphs": 57087,
+      "pixels": 16,
+      "sha256": "53aaf25b18d17aa4a7d79f0cab0896c36feaf81bb4607ffd66a50beb9364b4bd"
+    },
+    {
+      "family": "DomeD Fallback",
+      "source": "/usr/local/share/fonts/domed/unifont-17.0.04.bdf",
+      "source_sha256": "f2b2952312fa189f8963c85eb50fda14606a6df5d8dbe9e01651138eb2cecea9",
+      "glyphs": 57087,
+      "pixels": 16,
+      "sha256": "3e7d62a2a11c9e839f6098b313796c30238012d0767fe1efbedd96a1f6f11cfc"
+    },
+    {
+      "family": "DomeD Emoji",
+      "source": "/usr/local/share/fonts/domed/unifont-upper-17.0.04/unifont_upper-17.0.04.bdf",
+      "source_sha256": "f1a044cab74b1363d46d18e7c12d8f7161b49de159ef417de007b6ae1c2afc0a",
+      "glyphs": 58237,
+      "pixels": 16,
+      "sha256": "9aaabb9b0c994cc45c6a54814095540595d513c32088f51d77c5267d74b2a630"
+    }
+  ],
+  "tray_registered": true,
+  "tray_menu": true,
+  "universal_menu_associated": true,
+  "menu_edit_selection_and_replace": true,
+  "light_text_contrast": null,
+  "menu_zoom_action": true,
+  "menu_convention": true,
+  "menu_close_action": true,
+  "tray_quit_action": true,
+  "single_instance": true,
+  "clean_exit": true,
+  "real_account_tested": false,
+  "headset_tested": false
+}

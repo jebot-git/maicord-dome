@@ -44,11 +44,9 @@ struct D3D11GlyphTextFontFace {
 static_assert(sizeof(D3D11GlyphTextFontFace)==16);
 
 struct D3D11ColorGlyphOwner;
-struct NativeGlyphOutlines;
 struct ColrPaintBatch;
 struct GlyphRasterOrigin { i32 x, y; };
 struct D3D11GlyphTextOwner {
-    NativeGlyphOutlines* native_outlines;
     D3D11ColorGlyphOwner* color;
     ColrPaintBatch* color_batch;
     Arena storage;
@@ -59,7 +57,6 @@ struct D3D11GlyphTextOwner {
     TextGlyph* glyphs;
     TextRun* runs;
     u16* clusters;
-    GlyphPathCommand* path_commands;
     GlyphAtlasEntry* atlas_entries;
     GlyphAtlasRow* atlas_rows;
     GlyphRasterOrigin* atlas_origins;

@@ -246,6 +246,24 @@ SfntStatus bitmap_color_glyph_build(const CbdtFont& font, u16 glyph, float pixel
     if (!expand(*png, scanlines, rgba))
         return SfntStatus::unsupported;
 
+    // DomeD's BDF adapter stores white, one-bit PNGs. Keep the source pixels binary
+    // at every UI size; colour is applied by the draw quad, independently of the atlas.
+    if (font.pixelated) {
+        for (u32 row=0; row<height; ++row) {
+            for (u32 column=0; column<width; ++column) {
+                const i32 x=static_cast<i32>(floor_float((column+.5f-origin_x)/scale));
+                const i32 y=static_cast<i32>(floor_float((row+.5f-origin_y)/scale));
+                pixels[row*width+column] = x>=0 && y>=0 && x<static_cast<i32>(png->width) &&
+                    y<static_cast<i32>(png->height) ? rgba[y*png->width+x] : 0;
+            }
+        }
+        output->pixels=pixels; output->width=width; output->height=height;
+        output->left=static_cast<i32>(left); output->top=static_cast<i32>(top);
+        output->advance=static_cast<float>(image.advance)*scale;
+        rewind.succeeded=true;
+        return SfntStatus::ok;
+    }
+
     // Horizontal pass: every source row to `width` premultiplied columns of four floats.
     auto* rows = arena_allocate<float>(arena, png->height * width * 4);
 

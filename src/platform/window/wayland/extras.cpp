@@ -314,3 +314,13 @@ void window_set_icon(Window window, const IconImage* images, u32 count) noexcept
 }
 
 } // namespace maicord
+
+namespace maicord {
+bool window_wayland_application_menu(Window,const char* service,const char* path) noexcept {
+    using namespace wayland;
+    if(!g.window_exists || !g.application_menu_manager || !service || !path)return false;
+    if(!g.window.application_menu)g.window.application_menu=org_kde_kwin_appmenu_manager_create(g.application_menu_manager,g.window.surface);
+    org_kde_kwin_appmenu_set_address(g.window.application_menu,service,path);
+    return true;
+}
+}

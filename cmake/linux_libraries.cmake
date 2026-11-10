@@ -150,7 +150,7 @@ maicord_library(maicord_dbus
     src/platform/dbus/session.cpp
     src/platform/dbus/desktop_settings.cpp src/platform/dbus/notifications.cpp src/platform/dbus/open_uri.cpp
     src/platform/dbus/secret_service.cpp src/platform/dbus/portal.cpp
-    src/platform/dbus/tray.cpp src/platform/dbus/global_shortcuts.cpp src/platform/dbus/instance.cpp
+    src/platform/dbus/tray.cpp src/platform/dbus/application_menu.cpp src/platform/dbus/global_shortcuts.cpp src/platform/dbus/instance.cpp
     src/platform/dbus/file_chooser.cpp src/platform/dbus/launcher_entry.cpp
     LIBS maicord_core)
 

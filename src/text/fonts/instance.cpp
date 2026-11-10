@@ -13,9 +13,7 @@ NativeFontInstanceSlot* slot(const NativeFontInstanceStore& s,NativeFontInstance
     if(!h.slot||h.slot>s.slots.count||!h.generation)return nullptr;
     auto& p=s.slots[h.slot-1];return p.references&&p.generation==h.generation?&p:nullptr;
 }
-template<class T> usize bytes(u32 n) noexcept {return (static_cast<usize>(n)*sizeof(T)+7)&~usize{7};}
-void* array_data(Arena& state,u32 count,usize size,usize align) noexcept {return count?arena_allocate(&state,size*count,align):nullptr;}
-template<class T> Slice<T> array(Arena& state,u32 count) noexcept {return {static_cast<T*>(array_data(state,count,sizeof(T),alignof(T))),count};}
+
 }
 // Preparing an instance runs once per face and settings: compiled for size. The
 // handle operations below stay /O2.
@@ -25,59 +23,20 @@ __attribute__((minsize)) NativeFontResult native_font_instance_acquire(NativeFon
     WorkReport report{work,work,used};
     if(output)reset_value(output);if(!store||!valid(*store)||!output)return result(NativeFontError::invalid_input);
     const auto* face=native_font_get(*store->fonts,handle);if(!face)return result(NativeFontError::invalid_input);
-    const auto& geometry=face->geometry;const u32 axes=geometry.axes.axis_count;u32 child=0;
-    if(instructions && geometry.kind!=FontGeometryKind::truetype)return result(NativeFontError::font,SfntStatus::unsupported);
-    FontAxisMappings mappings{};auto status=font_axis_mappings_open(geometry.face,static_cast<u16>(axes),scratch.maps,&mappings,work,&child);work-=child;
-    if(status==SfntStatus::ok){status=font_axis_coordinates(geometry.axes,mappings,settings,scratch.coordinates,{},FontAxisPrecision::fixed16,work,&child);work-=child;}
-    if(status!=SfntStatus::ok)return result(NativeFontError::font,status);
+    const auto& geometry=face->geometry;
+    if(instructions || settings.count)return result(NativeFontError::font,SfntStatus::unsupported);
+    (void)scratch;(void)state_limit;
     u32 free_slot=store->slots.count;
     for(u32 i=0;i<store->slots.count;++i){
         if(!spend(work))return result(NativeFontError::font,SfntStatus::resource_limit);auto& p=store->slots[i];
         if(!p.references){if(free_slot==store->slots.count&&p.generation!=0xffffffffu)free_slot=i;continue;}
-        if(p.instance.face.slot!=handle.slot||p.instance.face.generation!=handle.generation||static_cast<bool>(p.instance.instructions)!=instructions)continue;
-        bool equal=true;const auto* variation=p.instance.geometry.variation;
-        if(axes){if(!spend(work,axes))return result(NativeFontError::font,SfntStatus::resource_limit);for(u32 a=0;equal&&a<axes;++a)equal=variation->coordinates[a]==scratch.coordinates[a];}
-        if(!equal)continue;if(p.references==0xffffffffu)return result(NativeFontError::capacity);
+        if(p.instance.face.slot!=handle.slot||p.instance.face.generation!=handle.generation)continue;
+        if(p.references==0xffffffffu)return result(NativeFontError::capacity);
         ++p.references;*output={i+1,p.generation};return result(NativeFontError::none);
     }
     if(free_slot==store->slots.count)return result(NativeFontError::capacity);
-    TtOutlineRequirements requirements{};usize required=0;
-    if(axes)required=bytes<SfntGvarInstance>(1)+bytes<double>(axes)+bytes<double>(geometry.gvar.shared_count);
-    if(instructions){status=tt_outline_requirements(geometry.face,&requirements);if(status!=SfntStatus::ok)return result(NativeFontError::font,status);
-        required+=bytes<TtOutlineInstance>(1)+bytes<i32>(requirements.storage)+bytes<i32>(requirements.cvt)+bytes<TtFunction>(requirements.functions)+bytes<TtPoint>(requirements.twilight);
-        if(static_cast<u64>(requirements.storage)+requirements.cvt+requirements.functions+requirements.twilight>work)return result(NativeFontError::font,SfntStatus::resource_limit);}
-    required=(required+4095)&~usize{4095}; // Pages are 4 KiB on every supported target.
-    if(required>state_limit)return result(NativeFontError::font,SfntStatus::resource_limit);
-    Arena state{};struct Cleanup {Arena& a;~Cleanup() noexcept {arena_release(&a);}} cleanup{state};
-    if(required&&!arena_initialize(&state,required,required,4096,ArenaTag::text))return result(NativeFontError::capacity,SfntStatus::ok,thread_last_error());
-    NativeFontInstance instance{handle,{&geometry,nullptr},nullptr};
-    if(axes){auto* variation=arena_allocate<SfntGvarInstance>(&state);auto coordinates=array<double>(state,axes),scalars=array<double>(state,geometry.gvar.shared_count);
-        if(!variation||!coordinates.data||(scalars.count&&!scalars.data))return result(NativeFontError::capacity);
-        if(!spend(work,axes))return result(NativeFontError::font,SfntStatus::resource_limit);copy_bytes(coordinates.data,scratch.coordinates.data,axes*sizeof(double));
-        if(geometry.gvar.table.data){status=sfnt_gvar_instance_prepare(geometry.gvar,{coordinates.data,axes},scalars,variation,work,&child);work-=child;
-            if(status!=SfntStatus::ok)return result(NativeFontError::font,status);}
-        else *variation={{},{coordinates.data,axes},{}};
-        instance.geometry.variation=variation;
-    }
-    if(instructions){auto* prepared=arena_allocate<TtOutlineInstance>(&state);const auto retained_end=arena_mark(&state);TtInterpreter buffers{};buffers.stack=scratch.stack;buffers.frames=scratch.frames;
-        buffers.storage=array<i32>(state,requirements.storage);buffers.cvt=array<i32>(state,requirements.cvt);buffers.functions=array<TtFunction>(state,requirements.functions);buffers.twilight=array<TtPoint>(state,requirements.twilight);
-        if(!prepared)return result(NativeFontError::capacity);TtExecution execution{};status=tt_outline_prepare(geometry,&buffers,prepared,&execution,work,&child);work-=child;
-        if(status!=SfntStatus::ok)return result(NativeFontError::font,status);
-        if(prepared->graphics.instruction_control&1){
-            // Disabled glyph programs cannot consume preparation arrays. Keep
-            // the small profile header and any preceding variation state, and
-            // decommit whole unused pages without allocating/copying again.
-            reset_value(&prepared->storage);reset_value(&prepared->cvt);reset_value(&prepared->functions);reset_value(&prepared->twilight);prepared->stack_capacity=0;
-            if(!arena_trim(&state,retained_end.offset))return result(NativeFontError::io,SfntStatus::ok,thread_last_error());
-        }
-        instance.instructions=prepared;
-    }
-#if defined(_WIN32)
-    // The DWORD for the old protection stays in this frame (pages_protect would end its lifetime at once).
-    if(state.base){DWORD old=0;if(!VirtualProtect(state.base,state.committed,PAGE_READONLY,&old))return result(NativeFontError::io,SfntStatus::ok,thread_last_error());}
-#else
-    if(state.base){if(!pages_protect(state.base,state.committed,PageAccess::read))return result(NativeFontError::io,SfntStatus::ok,thread_last_error());}
-#endif
+    Arena state{};
+    NativeFontInstance instance{handle,{&geometry}};
     if(!native_font_retain(store->fonts,handle))return result(NativeFontError::capacity);
     auto& p=store->slots[free_slot];p.instance=instance;p.state=state;reset_value(&state);p.references=1;++p.generation;
     *output={free_slot+1,p.generation};return result(NativeFontError::none);

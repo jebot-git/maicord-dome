@@ -32,8 +32,8 @@ SfntStatus native_layout_open(const NativeFontFace& font,u32 kind,SfntLayout& la
 }
 SfntStatus native_layout_variations(const NativeFontInstance& instance,const SfntLayout& layout,Arena& scratch,
     SfntFeatureSubstitutions& output,u32 work) noexcept {
-    reset_value(&output);if(!layout.variations)return SfntStatus::ok;
-    const auto coordinates=instance.geometry.variation?instance.geometry.variation->coordinates:ConstSlice<double>{};
+    (void)instance;reset_value(&output);if(!layout.variations)return SfntStatus::ok;
+    const auto coordinates=ConstSlice<double>{};
     if(coordinates.count>work)return SfntStatus::resource_limit;
     auto fixed=take<i16>(scratch,coordinates.count);if(!filled(fixed))return SfntStatus::output_too_small;
     for(u32 i=0;i<coordinates.count;++i){const double value=coordinates[i]*16384;fixed[i]=static_cast<i16>(value+(value<0?-.5:.5));}

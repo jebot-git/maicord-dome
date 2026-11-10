@@ -1,0 +1,5 @@
+{
+  "policy": "bitmap-only",
+  "shipping_compilation_units": 1373,
+  "forbidden_outline_implementation_sources": []
+}

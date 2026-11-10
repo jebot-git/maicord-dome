@@ -484,3 +484,22 @@ bool window_layout_types_text(Window, Key wanted, u8 modifiers) noexcept {
 }
 
 } // namespace maicord
+
+namespace maicord {
+bool window_wayland_edit_command(Window window,Key code) noexcept {
+    using namespace wayland;
+    // Existing edit handlers query keyboard state. Merely setting event.modifiers
+    // would leave menu-driven Ctrl+A/C/V as plain letter key events.
+    const Key keys[]={key::ctrl,key::left_ctrl,key::right_ctrl,key::shift,key::left_shift,key::right_shift,
+        key::alt,key::left_alt,key::right_alt,key::left_super,key::right_super,code};
+    u16 saved[sizeof(keys)]{};
+    for(u32 i=0;i<sizeof(keys);++i){saved[i]=g.keyboard.held_count[keys[i]];g.keyboard.held_count[keys[i]]=0;}
+    const u8 modifiers=g.keyboard.modifiers;
+    g.keyboard.modifiers=mod_ctrl;g.keyboard.held_count[key::ctrl]=1;g.keyboard.held_count[code]=1;
+    WindowEvent event{};event.type=EventType::key_down;event.flags=ev_synthetic;event.modifiers=mod_ctrl;event.key.key=code;
+    WindowEventResult result{};const bool sent=window_inject(window,event,&result);
+    g.keyboard.held_count[code]=0;event.type=EventType::key_up;(void)window_inject(window,event,&result);
+    for(u32 i=0;i<sizeof(keys);++i)g.keyboard.held_count[keys[i]]=saved[i];
+    g.keyboard.modifiers=modifiers;return sent;
+}
+}

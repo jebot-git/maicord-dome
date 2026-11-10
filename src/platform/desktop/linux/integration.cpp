@@ -9,11 +9,13 @@
 #include "maicord/core/scratch_pages.hpp"
 #include "maicord/os/file.hpp"
 #include "maicord/os/text.hpp"
+#include "maicord/sys/linux/path.hpp"
+#include "maicord/sys/linux/process.hpp"
 
 namespace maicord {
 namespace {
 
-constexpr wchar_t kApplicationId[] = L"io.github.maj113.MaiCord";
+constexpr wchar_t kApplicationId[] = L"org.domed.Discord";
 constexpr u32 kPathCapacity = 1024;
 constexpr u32 kFileCapacity = 32 * 1024;
 
@@ -77,7 +79,7 @@ bool base_path(const wchar_t* variable, const wchar_t* fallback, const wchar_t* 
 }
 
 bool startup_path(wchar_t* out, u32 capacity) noexcept {
-    return base_path(L"XDG_CONFIG_HOME", L"/.config", L"/autostart/io.github.maj113.MaiCord.desktop", out, capacity);
+    return base_path(L"XDG_CONFIG_HOME", L"/.config", L"/autostart/org.domed.Discord.desktop", out, capacity);
 }
 bool mimeapps_path(wchar_t* out, u32 capacity) noexcept {
     return base_path(L"XDG_CONFIG_HOME", L"/.config", L"/mimeapps.list", out, capacity);
@@ -120,6 +122,13 @@ bool executable_valid(ConstSlice<wchar_t> executable) noexcept {
 
 // `"<executable>"` as an Exec value starts it: a percent sign is doubled.
 void exec_program(Text* text, ConstSlice<wchar_t> executable) noexcept {
+    // Entries must re-enter the launcher to prepare bitmap fonts and the private profile.
+    wchar_t launcher[1024];
+    const char* command=environment_get("DOMECORD_LAUNCHER");
+    if(command && command[0]=='/') {
+        const u32 units=path_from_utf8(command,launcher,1024);
+        if(units)executable={launcher,units};
+    }
     text->add("\"");
     u32 first = 0;
     for (u32 i = 0; i <= executable.count; ++i) {
@@ -212,7 +221,7 @@ bool exec_names(const char* text, u32 count, ConstSlice<wchar_t> executable, cha
 }
 
 void entry_header(Text* text) noexcept {
-    text->add("[Desktop Entry]\nType=Application\nName=MaiCord\nIcon=io.github.maj113.MaiCord\nTerminal=false\n");
+    text->add("[Desktop Entry]\nType=Application\nName=DomeD Discord\nIcon=org.domed.Discord\nTerminal=false\n");
 }
 
 } // namespace

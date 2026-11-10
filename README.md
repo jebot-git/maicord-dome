@@ -1,3 +1,14 @@
+# DomeD Discord fork
+
+This is [jebot-git/maicord-dome](https://github.com/jebot-git/maicord-dome),
+a separate de-xr repository forked from [MaiCord](https://github.com/maj113/MaiCord).
+It is the Linux/Wayland **bitmap-only DomeD fork**. Start with
+[DOMED.md](DOMED.md) for building, launching, installation and validation.
+The upstream MaiCord README is preserved below as a reference; its Windows and
+outline-font statements do not describe this fork.
+
+---
+
 <div align="center">
 
 <img src=".github/assets/banner.svg" alt="MaiCord, a native Discord client for Windows and Linux" width="100%">

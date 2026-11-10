@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.28)
 # The Windows build: one Release configuration in the sibling MaiCord-build/Release directory,
 # checked before compiler discovery writes anything. The Linux build (tools/build_linux.sh) is
 # configured by the script into its own directory.
+if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "DomeD Discord is a Linux/Wayland bitmap-only fork")
+endif()
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
     set(MAICORD_LINUX ON)
 else()

@@ -1,13 +1,13 @@
 #pragma once
 #include "maicord/text/fonts/store.hpp"
-#include "maicord/text/opentype/tt_outline.hpp"
+
 #include "maicord/text/base.hpp"
 namespace maicord {
 struct NativeFontInstanceHandle {u32 slot,generation;};
 struct NativeFontInstance {
     NativeFontHandle face;
     FontGeometryInstance geometry;
-    const TtOutlineInstance* instructions;
+
 };
 struct NativeFontInstanceSlot {
     NativeFontInstance instance;
@@ -22,7 +22,7 @@ struct NativeFontPrepareScratch {
     Slice<AxisSegmentMap> maps;
     Slice<double> coordinates;
     Slice<i32> stack;
-    Slice<TtCallFrame> frames;
+
 };
 // Zero-initialized stable slots, serialized mutation and store-local handles,
 // as for NativeFontStore. Each live instance holds one face reference; shaped

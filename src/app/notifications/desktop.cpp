@@ -20,6 +20,12 @@
 #include "maicord/os/text.hpp"
 #include "maicord/platform/dbus/instance.hpp"
 #include "maicord/platform/dbus/tray.hpp"
+#include "maicord/platform/dbus/application_menu.hpp"
+#include "maicord/platform/desktop/shell_open.hpp"
+#include "maicord/platform/window/key.hpp"
+#include "maicord/app/shell/shortcut_registry.hpp"
+#include "../settings/settings.hpp"
+#include "../shell/window_runtime.hpp"
 #include "maicord/platform/window/wayland.hpp"
 #endif
 
@@ -230,11 +236,61 @@ void on_launch(void*, const dbus::LaunchRequest& request) noexcept {
     if (units)
         application_desktop_open_link({url, units});
 }
+// Universal menu commands use the same input/settings/voice paths as the local UI.
+void on_application_menu(u32 command) noexcept {
+    if(command>=20 && command<=25) {
+        const u8 keys[]={'Z','Y','X','C','V','A'};
+        (void)window_wayland_edit_command(g_app.window,keys[command-20]);
+    } else switch(command) {
+    case 10:reveal();break;
+    case 11:(void)application_settings_open();break;
+    case 61:window_request_close(g_app.window);break;
+    case 30:(void)application_zoom_shortcut({key::equals,mod_ctrl});break;
+    case 31:(void)application_zoom_shortcut({key::minus,mod_ctrl});break;
+    case 32:(void)application_zoom_shortcut({'0',mod_ctrl});break;
+    case 40:(void)application_voice_toggle_mute();break;
+    case 41:(void)application_voice_toggle_deafen();break;
+    case 42:(void)application_voice_leave();break;
+    case 50:(void)desktop_open_target(g_app.window,L"https://github.com/maj113/MaiCord#readme");break;
+    case 51:(void)desktop_open_target(g_app.window,L"https://github.com/maj113/MaiCord/issues");break;
+    case 60:window_minimize(g_app.window);break;
+    default:break;
+    }
+    application_request_frame();
+}
+void bind_application_menu(const char* service,const char* path) noexcept {
+    (void)window_wayland_application_menu(g_app.window,service,path);
+}
+void tick_application_menu() noexcept {
+    static bool started=false;
+    const auto input=tray_input();const bool edit=!application_input_blocked();
+    // Stable 1-based IDs. Root headings are entries 1 through 6.
+    const dbus::ApplicationMenuEntry menu[]={
+        {0,"File",0},{0,"Edit",0},{0,"View",0},{0,"Voice",0},{0,"Window",0},{0,"Help",0},
+        {1,"Close Window",61},{3,"Preferences...",11},
+        {2,"Undo",20,edit && !g_app.login.visible,false,false,"Control","z"},
+        {2,"Redo",21,edit && !g_app.login.visible,false,false,"Control","y"},
+        {2,"Cut",22,edit && !g_app.login.visible,false,false,"Control","x"},
+        {2,"Copy",23,edit && !g_app.login.visible,false,false,"Control","c"},
+        {2,"Paste",24,edit,false,false,"Control","v"},
+        {2,"Select All",25,edit,false,false,"Control","a"},
+        {3,"Zoom In",30,true,false,false,"Control","plus"},
+        {3,"Zoom Out",31,true,false,false,"Control","minus"},
+        {3,"Reset Zoom",32,true,false,false,"Control","0"},
+        {4,"Mute",40,input.connected,true,input.self_mute},
+        {4,"Deafen",41,input.connected,true,input.self_deaf},
+        {4,"Disconnect",42,input.connected},
+        {5,"Bring to Front",10},{5,"Minimize",60},
+        {6,"MaiCord Documentation",50},{6,"Report an Issue",51}
+    };
+    dbus::application_menu_update(menu,static_cast<u32>(sizeof(menu)/sizeof(menu[0])));
+    if(!started)started=dbus::application_menu_start(on_application_menu,bind_application_menu);
+}
 void tick_tray(u64 now_ms) noexcept {
     if (!g_desktop.tray_started) {
         if (now_ms < g_desktop.tray_retry_ms)
             return;
-        g_desktop.tray_started = dbus::tray_start("maicord", on_tray, nullptr);
+        g_desktop.tray_started = dbus::tray_start("org.domed.Discord", on_tray, nullptr);
         if (!g_desktop.tray_started) {
             g_desktop.tray_retry_ms = now_ms + 5'000;
             return;
@@ -282,7 +338,7 @@ void tick_tray(u64 now_ms) noexcept {
                    items[i].command == tray_command_mute || items[i].command == tray_command_deafen, items[i].checked,
                    items[i].separator_before};
     }
-    dbus::tray_update({"MaiCord", tooltip_text, icons, icon_count, false, menu, count});
+    dbus::tray_update({"DomeD Discord", tooltip_text, icons, icon_count, false, menu, count});
     g_desktop.tray_input = input;
     g_desktop.tray_palette = colors;
     g_desktop.tray_sent = true;
@@ -386,7 +442,7 @@ dbus::InstanceResult acquire_instance(ConstSlice<wchar_t> command_line) noexcept
         profile_key = profile;
     }
     g_desktop.instance_checked = true;
-    return dbus::instance_acquire({"io.github.maj113.MaiCord", profile_key}, request, kForwardTimeoutMs);
+    return dbus::instance_acquire({"org.domed.Discord", profile_key}, request, kForwardTimeoutMs);
 }
 } // namespace
 
@@ -444,6 +500,9 @@ void application_desktop_tick(u64 now_ms) noexcept {
         const DWORD waited = WaitForSingleObject(g_desktop.mutex, 0);
         g_desktop.owns_mutex = waited == WAIT_OBJECT_0 || waited == WAIT_ABANDONED;
     }
+#endif
+#if !defined(_WIN32)
+    tick_application_menu();
 #endif
     tick_tray(now_ms);
     tick_link(now_ms);
@@ -523,6 +582,7 @@ void application_desktop_release() noexcept {
         CloseHandle(g_desktop.mutex);
     }
 #else
+    dbus::application_menu_stop();
     if (g_desktop.tray_started)
         dbus::tray_stop();
     if (g_desktop.instance_checked)

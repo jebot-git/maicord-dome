@@ -1,4 +1,4 @@
-// twin: src/render/shaders/glyph_draw.hlsl f3272e0606f93e4a
+// twin: src/render/shaders/glyph_draw.hlsl 6504b5109285f0d0
 // Text quads and text effects: glyph_vertex (STAGE_VS) and glyph_pixel (STAGE_PS). The atlases are paged surfaces
 // (see media_draw.glsl): each draw binds the page its quads sample, and their v is in that page's rows.
 
@@ -179,7 +179,8 @@ const vec2 kDirections[8] = vec2[8](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1
                                     vec2(0.707, 0.707), vec2(-0.707, 0.707), vec2(0.707, -0.707), vec2(-0.707, -0.707));
 
 vec4 shade() {
-    if (v_bounds.x >= 2.0) return color_sample(v_uv) * v_color.a;
+    // Bitmap masks use the quad's text color. Actual color emoji submit white tint.
+    if (v_bounds.x >= 2.0) return color_sample(v_uv) * vec4(v_color.rgb, 1.0) * v_color.a;
     float coverage = 1.0;
     if (v_uv.x <= -2.0) {
         vec2 local = vec2(v_uv.x + 3.0, v_uv.y) - 0.5;

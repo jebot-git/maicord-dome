@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "test_hooks": false,
+  "binary": "/home/blux/de-xr/maicord-dome-build/MaiCord",
+  "bytes": 6700920,
+  "sha256": "9dd60a3a112a6853c4bae97632ded649426c897858a1d74f88887a9f4f1b2ff2",
+  "upstream": "a906bd7c58a3ebe40310f49cace894f7d2e67b62",
+  "outline_font_support": false,
+  "upstream_size_target_bytes": 6500000,
+  "upstream_size_target_met": false
+}

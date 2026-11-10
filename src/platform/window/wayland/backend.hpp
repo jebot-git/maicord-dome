@@ -208,6 +208,7 @@ struct WindowState {
     xdg_surface* shell_surface;
     xdg_toplevel* toplevel;
     zxdg_toplevel_decoration_v1* decoration;
+    org_kde_kwin_appmenu* application_menu;
     wp_viewport* viewport;
     wp_fractional_scale_v1* fractional;
     wl_callback* frame_callback;
@@ -250,6 +251,8 @@ struct Backend {
     wp_fractional_scale_manager_v1* fractional_manager;
     wp_cursor_shape_manager_v1* cursor_shape_manager;
     zxdg_decoration_manager_v1* decoration_manager;
+    org_kde_kwin_appmenu_manager* application_menu_manager;
+    u32 application_menu_version;
     u32 seat_version;
 
     WindowCaps caps;

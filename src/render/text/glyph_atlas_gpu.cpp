@@ -118,7 +118,7 @@ GlyphAtlasGpuResult glyph_atlas_gpu_initialize_paged(GlyphAtlasGpu* gpu, GpuDevi
         return gpu_error(GlyphAtlasGpuError::create_resource, result);
     }
     gpu->texture_view = gpu_paged_texture_view(gpu->surface);
-    return create_raster_resources(gpu, device);
+    return gpu_error(GlyphAtlasGpuError::none); // Text is bitmap upload only; no path buffers or raster shader.
 }
 #pragma clang attribute pop
 

@@ -225,7 +225,7 @@ void taskbar_attention_release(TaskbarAttention* attention, Window owner) noexce
 #else
 namespace {
 // The desktop file of the application (packaging/linux), which the dock matches the entry to.
-constexpr char kDesktopId[] = "io.github.maj113.MaiCord.desktop";
+constexpr char kDesktopId[] = "org.domed.Discord.desktop";
 } // namespace
 
 bool taskbar_attention_initialize(TaskbarAttention* attention) noexcept {

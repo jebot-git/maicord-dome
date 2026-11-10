@@ -6,6 +6,9 @@
 #include "maicord/core/time.hpp"
 #include "custom_theme.hpp"
 #include "theme_publication.hpp"
+#if !defined(_WIN32)
+#include "../linux/domed_theme.hpp"
+#endif
 
 #include "maicord/core/win32_kernel.hpp"
 
@@ -39,6 +42,10 @@ u64 glide_now() noexcept {
 // the clock or a light/dark flip over the effects' appearance glide, and the minutes as they come at once (a
 // development folder's running simulation brings many between publications: its course is no jump).
 Theme look(ThemePublication& p, const ClientThemeDocument* document, u32* glide_ms) noexcept {
+#if !defined(_WIN32)
+    if (environment_get("DOMECORD_SESSION"))
+        return domed_theme();
+#endif
     if (!document)
         return client_theme_projection(g_app.preferences);
     if (!client_theme_document_scheduled(*document))

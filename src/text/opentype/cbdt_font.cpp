@@ -164,6 +164,9 @@ SfntStatus cbdt_open(const SfntFace& face, CbdtFont* output) noexcept {
         return SfntStatus::malformed;
     if (!span(font.locations, kHeaderBytes, static_cast<u64>(font.strike_count) * kStrikeBytes))
         return SfntStatus::truncated;
+    ConstSlice<u8> marker{};
+    font.pixelated = sfnt_table(face, sfnt_tag('D','O','M','B'), &marker) == SfntStatus::ok &&
+        marker.count == 4 && be32(marker, 0) == 1;
     *output = font;
     return SfntStatus::ok;
 }

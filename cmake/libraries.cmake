@@ -194,8 +194,8 @@ maicord_library(maicord_font
     src/text/shaping/cluster_run.cpp src/text/scripts/devanagari_forms.cpp
     src/text/shaping/script_paragraphs.cpp src/text/scripts/indic_run_plan.cpp
     src/text/scripts/indic_syllables.cpp src/text/scripts/indic_shape.cpp src/text/shaping/compact_run.cpp
-    src/text/opentype/tt_orientation.cpp
-    src/text/opentype/tt_bold_points.cpp src/text/fonts/session.cpp src/text/fonts/prepare.cpp
+
+     src/text/fonts/session.cpp src/text/fonts/prepare.cpp
     src/text/opentype/gpos_cursive_execute.cpp src/text/opentype/position_anchor.cpp src/text/opentype/gpos_mark_execute.cpp
     src/text/opentype/gpos_ligature_execute.cpp src/text/opentype/gpos_execute.cpp src/text/opentype/gpos_program.cpp
     src/text/opentype/lookup_selection.cpp src/text/opentype/position_flags.cpp
@@ -213,12 +213,12 @@ maicord_library(maicord_font
     src/text/layout/unicode_line_geometry.cpp src/text/scripts/latin_line.cpp src/text/scripts/latin_paragraph.cpp
     src/text/scripts/ascii_line.cpp src/text/scripts/ascii_paragraph.cpp src/text/layout/paragraph_hits.cpp
     src/text/layout/paragraph_ranges.cpp src/text/fonts/metrics.cpp src/text/opentype/layout_variations.cpp src/text/opentype/gdef.cpp
-    src/text/opentype/layout_tables.cpp src/text/opentype/sfnt.cpp src/text/opentype/sfnt_cmap.cpp src/text/opentype/truetype_outline.cpp
-    src/text/opentype/cff_font.cpp src/text/opentype/cff_charset.cpp src/text/opentype/cff_outline.cpp src/text/opentype/cpal.cpp
-    src/text/opentype/colr_font.cpp src/text/opentype/colr_paint_reader.cpp
-    src/text/opentype/variation_store.cpp src/text/opentype/metric_variations.cpp src/text/opentype/gvar.cpp src/text/fonts/geometry.cpp
-    windows:src/text/fonts/store.cpp src/text/fonts/instance.cpp src/text/opentype/tt_interpreter.cpp
-    src/text/opentype/tt_outline.cpp src/text/opentype/colr_variations.cpp src/text/fonts/axes.cpp
+    src/text/opentype/layout_tables.cpp src/text/opentype/sfnt.cpp src/text/opentype/sfnt_cmap.cpp
+
+
+    src/text/opentype/variation_store.cpp src/text/opentype/metric_variations.cpp  src/text/fonts/geometry.cpp
+    windows:src/text/fonts/store.cpp src/text/fonts/instance.cpp
+      src/text/fonts/axes.cpp
     # The font store, the catalog check and the handle stamp read the file system through the files seam
     # (include/maicord/os/file.hpp); handle_stat.cpp has a Linux twin.
     linux:src/text/fonts/store.cpp linux:src/text/fonts/catalog.cpp linux:src/text/fonts/linux/handle_stat.cpp
@@ -229,6 +229,13 @@ maicord_library(maicord_font
 # Arabic and Devanagari within 1%). The lookup executors, the Latin, ASCII,
 # Arabic and Devanagari shapers and the paragraph layout keep unrolling: without
 # it message_hit_rebuild was 3-9% slower and cycles_arabic 2.4%.
+# Reject future reintroduction of outline font parsers into the bitmap-only archive.
+get_target_property(domed_font_sources maicord_font SOURCES)
+foreach(source IN LISTS domed_font_sources)
+    if(source MATCHES "/(cff_|colr_|truetype_outline|tt_|gvar|cpal)")
+        message(FATAL_ERROR "Outline font implementation forbidden: ${source}")
+    endif()
+endforeach()
 get_target_property(maicord_rolled_sources maicord_font SOURCES)
 list(FILTER maicord_rolled_sources INCLUDE REGEX
     "/(opentype/(sfnt|cff_|tt_|truetype_outline|colr_|cpal|gvar|variation_store|metric_variations|layout_directory|layout_tables|gdef|layout_variations|lookup_selection|nominal_)|scripts/hebrew|layout/unicode_line_geometry)")
@@ -245,7 +252,7 @@ maicord_library(maicord_vector_geometry
     LIBS maicord_core)
 
 maicord_library(maicord_paint_program
-    src/render/effects/colr_program.cpp src/render/effects/colr_source.cpp src/render/effects/regional_flag_program.cpp
+    src/render/effects/colr_program.cpp src/render/effects/regional_flag_program.cpp
     src/render/effects/lottie_program.cpp
     LIBS maicord_vector_geometry maicord_core maicord_render_core maicord_font maicord_media_core)
 
@@ -375,7 +382,7 @@ maicord_library(maicord_renderer
     src/render/media/animation_frame_cache_gpu.cpp src/render/text/content_text_retention.cpp
     src/render/text/shaped_text_cache.cpp src/render/d3d11/device.cpp src/render/d3d11/draw_pipeline.cpp
     windows:src/render/effects/colr_paint.cpp src/render/d3d11/glyph_text.cpp src/render/media/icon_atlas.cpp
-    src/render/text/native_glyph_outlines.cpp src/render/d3d11/background_fx.cpp
+    src/render/d3d11/background_fx.cpp
     windows:src/render/d3d11/effect_renderer.cpp windows:src/render/d3d11/effect_inputs.cpp src/render/d3d11/effect_glyphs.cpp
     src/render/d3d11/renderer.cpp src/render/d3d11/renderer_draw.cpp src/render/d3d11/renderer_edit.cpp
     src/render/d3d11/renderer_layout.cpp src/render/d3d11/renderer_layout_media.cpp src/render/d3d11/renderer_text.cpp

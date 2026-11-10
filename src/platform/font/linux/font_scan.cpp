@@ -9,6 +9,7 @@
 #include "maicord/os/file.hpp"
 #include "maicord/sys/linux/path.hpp"
 #include "maicord/text/fonts/family.hpp"
+#include "maicord/text/fonts/geometry.hpp"
 
 #include "font_config.hpp"
 #include "font_names.hpp"
@@ -143,6 +144,8 @@ void add_file(Walk& walk, const wchar_t* path) noexcept {
                 return;
             stored_path = true;
         }
+        FontGeometry bitmap{};
+        if(font_geometry_open(face,&bitmap)!=SfntStatus::ok)continue;
         ScanFace entry{};
         if (!store_name(walk.scan, name, family.units, &entry.name))
             return;

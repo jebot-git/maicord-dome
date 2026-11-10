@@ -1,3 +1,18 @@
+# DomeD fork
+
+This checkout targets Linux/Wayland and bitmap-only text. Read DOMED.md first.
+The upstream Windows-specific build instructions below are historical; this fork
+rejects non-Linux targets. Do not restore outline font parsers, renderers, bundled
+outline fonts, or system outline fallbacks. BDF-derived CBDT containers are bitmap
+fonts even though their file extension is .ttf. Keep universal menu and tray
+exports separate and associate the former with the Wayland surface.
+
+Upstream outline-font tests are obsolete here. Run the DomeD adapter/native bitmap
+tests, retained plugin ABI/ELF loader tests, and disposable real-DomeD menu test
+listed in DOMED.md. The shipping executable must be rebuilt without test hooks.
+
+---
+
 # Working on MaiCord
 
 Guidance for coding agents and contributors. [CONTRIBUTING.md](CONTRIBUTING.md) has the same rules in more detail; subsystem design

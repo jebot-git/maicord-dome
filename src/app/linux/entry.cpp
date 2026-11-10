@@ -50,7 +50,7 @@ bool version_requested(const maicord::ProcessStartup& startup) noexcept {
 
 [[noreturn]] void print_version() noexcept {
     using namespace maicord;
-    constexpr char kName[] = "MaiCord ";
+    constexpr char kName[] = "DomeD Discord (MaiCord core) ";
     char text[64];
     for (usize i = 0; i < sizeof(kName) - 1; ++i) {
         text[i] = kName[i];

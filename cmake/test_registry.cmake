@@ -3292,3 +3292,19 @@ foreach(maicord_registered_test IN LISTS maicord_registered_tests)
         set_tests_properties(${maicord_registered_test} PROPERTIES SKIP_RETURN_CODE 77)
     endif()
 endforeach()
+
+# DomeD bitmap-only font policy and exact BDF pixels, including fractional UI sizes.
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/dome/fixture.py"
+    "${MAICORD_GENERATED_DIRECTORY}/domed-bitmap.ttf" COMMAND_ERROR_IS_FATAL ANY)
+maicord_test(DomeDBitmapTests ENTRY domed_bitmap_entry SOURCES tests/dome/bitmap_font_test.cpp
+    LIBS maicord_font_color maicord_font maicord_media_codec maicord_compression maicord_core
+    TIMEOUT 5 ENV DOMECORD_BITMAP_FIXTURE=${MAICORD_GENERATED_DIRECTORY}/domed-bitmap.ttf
+    TEST domed_bitmap_native)
+
+# Optional real-compositor convention check. It runs on a disposable bus/display and needs the
+# sibling DomeD build plus uv, Xvfb and the Python image/X11 test dependencies.
+if(DEFINED ENV{DOMECORD_UI_TESTS})
+    add_test(NAME domed_universal_menu COMMAND uv run --no-project --with pillow --with python-xlib
+        python "${CMAKE_SOURCE_DIR}/dome/test_ui.py")
+    set_tests_properties(domed_universal_menu PROPERTIES LABELS integration TIMEOUT 30)
+endif()

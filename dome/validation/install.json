@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "launcher": "/home/blux/.local/bin/dome-discord",
+  "desktop_id": "org.domed.Discord",
+  "binary_sha256": "9dd60a3a112a6853c4bae97632ded649426c897858a1d74f88887a9f4f1b2ff2",
+  "version_check": true
+}

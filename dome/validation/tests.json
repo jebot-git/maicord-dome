@@ -1,0 +1,11 @@
+{
+  "python_adapter_tests": 3,
+  "native_tests": [
+    "domed_bitmap_native",
+    "maicord_native_cbdt_fixture",
+    "maicord_plugin_abi",
+    "maicord_plugin_loader_elf"
+  ],
+  "native_tests_passed": 4,
+  "outline_and_hybrid_rejection_tested": true
+}

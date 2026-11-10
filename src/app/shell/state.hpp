@@ -1,3 +1,6 @@
+#if !defined(_WIN32)
+#include "maicord/sys/linux/process.hpp"
+#endif
 #pragma once
 #include "../account/self_status.hpp"
 #include "../media/gif_favorites.hpp"
@@ -531,7 +534,17 @@ inline float application_user_color_saturation() noexcept {
 // The DPI the interface lays out and draws at: the window's, scaled by Accessibility's Zoom level.
 inline u32 application_zoomed_dpi(u32 window_dpi) noexcept {
     const u32 zoom = g_app.preferences.zoom ? g_app.preferences.zoom : 100;
-    return (window_dpi ? window_dpi : 96) * zoom / 100;
+    u32 session_zoom=100;
+#if !defined(_WIN32)
+    if(const char* text=environment_get("DOMECORD_ZOOM")) {
+        u32 value=0;for(u32 i=0;text[i] && i<4;++i) {
+            if(text[i]<'0' || text[i]>'9'){value=0;break;}
+            value=value*10+text[i]-'0';
+        }
+        if(value>=50 && value<=400)session_zoom=value;
+    }
+#endif
+    return (window_dpi ? window_dpi : 96) * zoom * session_zoom / 10000;
 }
 
 const Theme& application_theme() noexcept;

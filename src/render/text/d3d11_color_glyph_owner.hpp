@@ -5,10 +5,6 @@
 
 namespace maicord {
 struct D3D11ColorGlyphOwner {
-    ColrPaintProgram program;
     ColrPaintGpu gpu;
-    // Direct-mapped dependency hints. Identity includes face and glyph; a
-    // collision only causes a rebuild, never reuse with the wrong foreground.
-    u32 foreground_hints[256];
 };
 } // namespace maicord

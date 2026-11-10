@@ -41,6 +41,7 @@ if(MAICORD_LINUX)
     set(MAICORD_WAYLAND_XML_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/wayland")
     set(MAICORD_WAYLAND_XML
         "${MAICORD_WAYLAND_XML_DIRECTORY}/wayland.xml"
+        "${MAICORD_WAYLAND_XML_DIRECTORY}/appmenu.xml"
         "${MAICORD_WAYLAND_XML_DIRECTORY}/xdg-shell.xml"
         "${MAICORD_WAYLAND_XML_DIRECTORY}/viewporter.xml"
         "${MAICORD_WAYLAND_XML_DIRECTORY}/tablet-v2.xml"

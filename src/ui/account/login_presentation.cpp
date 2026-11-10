@@ -77,7 +77,7 @@ bool login_presentation_build(const LoginScene& scene, const LoginPresentationIn
     const UiRect password_field = login_scene_rectangle(scene, LoginElement::password_field);
     const UiRect submit = login_scene_rectangle(scene, LoginElement::submit);
     const UiRect qr = login_scene_rectangle(scene, LoginElement::qr);
-    if (!push_border_truncated(stream, theme, card, theme.surface, {}, scene.full_viewport ? 0.0f : 8.0f,
+    if (!push_border_truncated(stream, theme, card, theme.surface, {}, scene.full_viewport ? 0.0f : theme.scale.radius_md,
                                0) ||
         (!scene.phone_mode && !scene.browser_mode &&
          !push_field_truncated(stream, theme, login_field,
@@ -108,7 +108,7 @@ bool login_presentation_build(const LoginScene& scene, const LoginPresentationIn
         }
         if (scene.focus_visible && scene.focus == LoginControl::phone_resend &&
             !push_border_truncated(stream, theme, login_scene_rectangle(scene, LoginElement::mfa_sms),
-                                   theme.base_low, theme.tokens.border.focus, 4.0f, 1.0f))
+                                   theme.base_low, theme.tokens.border.focus, theme.scale.radius_sm, 1.0f))
             return false;
     }
 
@@ -171,18 +171,18 @@ bool login_presentation_build(const LoginScene& scene, const LoginPresentationIn
         const bool focused = scene.focus_visible && scene.focus == method.control;
         if (!push_border_truncated(stream, theme, login_scene_rectangle(scene, method.element),
                                    selected ? theme.interactive : theme.base_lowest,
-                                   focused || selected ? theme.tokens.emphasis.outline : theme.interactive, 4.0f, 1.0f)) {
+                                   focused || selected ? theme.tokens.emphasis.outline : theme.interactive, theme.scale.radius_sm, 1.0f)) {
             return false;
         }
     }
     if ((scene.back_only || scene.phone_mode || scene.reset_mode || scene.recovery_mode) &&
         scene.focus_visible && scene.focus == LoginControl::back &&
         !push_border_truncated(stream, theme, login_scene_rectangle(scene, LoginElement::forgot_password),
-                               theme.base_low, theme.tokens.border.focus, 4.0f, 1.0f))
+                               theme.base_low, theme.tokens.border.focus, theme.scale.radius_sm, 1.0f))
         return false;
     if (scene.browser_available && scene.focus_visible && scene.focus == LoginControl::browser_sign_in &&
         !push_border_truncated(stream, theme, login_scene_rectangle(scene, LoginElement::browser_sign_in),
-                               theme.base_low, theme.tokens.border.focus, 4.0f, 1.0f))
+                               theme.base_low, theme.tokens.border.focus, theme.scale.radius_sm, 1.0f))
         return false;
     if (!push_rounded_truncated(stream, submit, scene.submit_disabled ? theme.interactive : theme.tokens.emphasis.fill,
                                 4.0f)) {

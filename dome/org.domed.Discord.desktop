@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=DomeD Discord
+Comment=Native bitmap Discord client based on MaiCord
+Exec=dome-discord %U
+Icon=org.domed.Discord
+Terminal=false
+Categories=Network;InstantMessaging;
+MimeType=x-scheme-handler/discord;x-scheme-handler/maicord;
+StartupWMClass=org.domed.Discord

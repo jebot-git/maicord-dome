@@ -258,6 +258,9 @@ void application_caption_enable() noexcept {
 }
 
 u32 application_caption_pixels(u32 dpi) noexcept {
+#if !defined(_WIN32)
+    if(!window_caps().csd)return 0; // DomeD owns the frame; controls live in the universal menu.
+#endif
     if (!g_caption.enabled || g_caption.hidden)
         return 0;
     return static_cast<u32>(ui_caption_bar_height(application_theme()) * static_cast<float>(dpi) / 96.0f + .5f);

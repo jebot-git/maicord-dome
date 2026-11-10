@@ -503,7 +503,7 @@ bool login_text_presentation_build(const LoginScene& scene, const LoginView& vie
                         reset                ? utf8_literal("Reset your password")
                         : recovery           ? utf8_literal("Password recovery")
                         : scene.add_account  ? utf8_literal("Add an account")
-                                             : utf8_literal("Log in to MaiCord"),
+                                             : utf8_literal("Log in to Discord"),
                         Role::heading) ||
         !append_command(
             out, LoginElement::subtitle,

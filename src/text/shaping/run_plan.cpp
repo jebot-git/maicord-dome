@@ -23,7 +23,7 @@ struct PlanData {
     NativeNominalPlan nominal;
     SfntFontLayoutMetrics layout_metrics;
     NativeRunPlanHandle parent;
-    const SfntTrueType* bold_font;
+
 };
 NativeFontResult failure(SfntStatus status) noexcept {return {NativeFontError::font,status,0};}
 #include "run_substitutions.inc"
@@ -40,24 +40,6 @@ SfntStatus advance(void* context,u16 glyph,double* output) noexcept {
 SfntStatus hvar_advance(void* context,u16 glyph,double* output) noexcept {
     const auto& p=*static_cast<const PlanData*>(context);u16 value=0;
     const auto status=sfnt_hvar_design_advance(p.hvar,p.hvar_instance.scalars,p.metrics,glyph,&value);*output=value;return status;
-}
-SfntStatus gvar_advance(void* context,u16 glyph,double* output) noexcept {
-    const auto& instance=*static_cast<const FontGeometryInstance*>(context);u16 value=0;
-    const auto status=sfnt_gvar_design_advance(instance.font->outline.truetype,*instance.variation,glyph,&value);*output=value;return status;
-}
-SfntStatus bold_advance(void* context,u16 glyph,double* output) noexcept {
-    if(!output)return SfntStatus::invalid_input;*output=0;
-    const auto& p=*static_cast<const PlanData*>(context);SfntGlyphMetrics metrics{};
-    auto status=sfnt_horizontal_metrics(p.metrics,glyph,&metrics);if(status!=SfntStatus::ok)return status;
-    u32 value=metrics.advance;
-    if(value){const auto& f=*p.bold_font;const u32 stride=f.loca_stride;
-        if((stride!=2&&stride!=4)||!f.loca.data||f.loca.count/stride<=static_cast<u32>(glyph)+1)return SfntStatus::malformed;
-        const u32 first=sfnt_read::loca_offset(f.loca,stride,glyph),end=sfnt_read::loca_offset(f.loca,stride,static_cast<u32>(glyph)+1);if(first>end||end>f.glyf.count)return SfntStatus::malformed;
-        if(first<end){if(!f.glyf.data||end-first<10)return SfntStatus::malformed;const auto* box=f.glyf.data+first+2;
-            const i32 width=static_cast<i16>(byte_load_be16(box+4))-static_cast<i16>(byte_load_be16(box));
-            const i32 height=static_cast<i16>(byte_load_be16(box+6))-static_cast<i16>(byte_load_be16(box+2));
-            if(width<0||height<0)return SfntStatus::malformed;if(width&&height)value+=(static_cast<u32>(p.metrics.units_per_em)+25)/50;}
-    }*output=value;return SfntStatus::ok;
 }
 // Plan preparation runs once per font instance and kind (not per run): compiled for size.
 #pragma clang attribute push(__attribute__((minsize)), apply_to = function)
@@ -79,11 +61,11 @@ SfntStatus prepare(const NativeFontInstance& instance,const NativeFontFace& nati
     SfntGdef gdef{};status=sfnt_table(face,sfnt_tag('G','D','E','F'),&bytes);
     if(status==SfntStatus::ok){status=sfnt_gdef_open(bytes,p.metrics.glyph_count,&gdef);if(status!=SfntStatus::ok)return status;}
     else if(status!=SfntStatus::missing_table)return status;
-    const auto coordinates=instance.geometry.variation?instance.geometry.variation->coordinates:ConstSlice<double>{};
+    const auto coordinates=ConstSlice<double>{};
     auto feature_coordinates=take<i16>(scratch,coordinates.count);
     if(coordinates.count&&!feature_coordinates.data)return SfntStatus::output_too_small;
     for(u32 i=0;i<coordinates.count;++i){const double value=coordinates[i]*16384;feature_coordinates[i]=static_cast<i16>(value+(value<0?-.5:.5));}
-    p.variable=instance.geometry.variation!=nullptr;
+    p.variable=false;
     if(p.variable){
         status=sfnt_table(face,sfnt_tag('H','V','A','R'),&bytes);
         if(status==SfntStatus::ok){status=sfnt_hvar_open(bytes,&p.hvar,work);if(status!=SfntStatus::ok)return status;
@@ -104,7 +86,6 @@ SfntStatus prepare(const NativeFontInstance& instance,const NativeFontFace& nati
     for(u32 mode=0;mode<2;++mode){auto& plan=p.plans[mode];plan.substitutions=&p.substitutions;
         plan.gdef=gdef;plan.metric_context=p.hvar.store.table.data?static_cast<void*>(&p):&p.metrics;
         plan.advance=p.hvar.store.table.data?hvar_advance:advance;plan.units_per_em=p.metrics.units_per_em;
-        if(font.gvar.table.data&&!p.hvar.store.table.data){plan.metric_context=const_cast<FontGeometryInstance*>(&instance.geometry);plan.advance=gvar_advance;}
         plan.cache_advances=p.variable;
         plan.position_instance={p.gdef_instance.store.table.data?&p.gdef_instance:nullptr,0,0,p.variable,VariationArithmetic::float_32};}
     if(!p.variable&&p.nominal.ascii_count){auto table=take<u16>(state,p.nominal.ascii_count);if(!filled(table))return SfntStatus::resource_limit;
@@ -164,8 +145,7 @@ NativeFontResult native_run_plan_acquire(NativeRunPlanStore* store,NativeFontIns
         return {NativeFontError::invalid_input,SfntStatus::invalid_input,0};
     const auto* font=native_font_instance_get(*store->instances,instance);if(!font)return {NativeFontError::invalid_input,SfntStatus::invalid_input,0};
     const auto* face=native_font_get(*store->instances->fonts,font->face);if(!face)return {NativeFontError::invalid_input,SfntStatus::invalid_input,0};
-    const bool bold=(simulations&1)!=0&&!font_ignores_bold(face->geometry);
-    if(bold&&(face->geometry.kind!=FontGeometryKind::truetype||face->geometry.gvar.table.data))return failure(SfntStatus::unsupported);
+    const bool bold=false; // Native bitmap weight is selected by face, never synthesized.
     u32 available=store->slots.count;
     if(store->slots.count>work)return failure(SfntStatus::resource_limit);
     for(u32 i=0;i<store->slots.count;++i){auto& p=store->slots[i];
@@ -193,10 +173,8 @@ NativeFontResult native_run_plan_acquire(NativeRunPlanStore* store,NativeFontIns
     if(!arena_initialize(&state,bold?page:limit,0,page,ArenaTag::text))return {NativeFontError::capacity,SfntStatus::resource_limit,GetLastError()};
     auto* data=arena_allocate_zero<PlanData>(&state);if(!data)return failure(SfntStatus::resource_limit);data->kind=kind;
     SubstitutionScope substitutions{store->substitutions};
-    if(bold){const auto& base=*reinterpret_cast<const PlanData*>(store->slots[parent.slot-1].state.base);
-        data->metrics=base.metrics;data->nominal=base.nominal;data->nominal.ascii_advances=nullptr;data->layout_metrics=base.layout_metrics;data->parent=parent;data->bold_font=&face->geometry.outline.truetype;
-        for(u32 mode=0;mode<2;++mode){data->plans[mode]=base.plans[mode];data->plans[mode].metric_context=data;data->plans[mode].advance=bold_advance;data->plans[mode].cache_advances=true;}}
-    else{arena_reset(scratch);const auto status=prepare(*font,*face,*data,state,*scratch,work,limit,store->substitutions);if(status!=SfntStatus::ok)return failure(status);}
+    arena_reset(scratch);const auto status=prepare(*font,*face,*data,state,*scratch,work,limit,store->substitutions);if(status!=SfntStatus::ok)return failure(status);
+
 #if defined(_WIN32)
     DWORD old=0;if(!VirtualProtect(state.base,state.committed,PAGE_READONLY,&old))return {NativeFontError::io,SfntStatus::ok,GetLastError()};
 #else

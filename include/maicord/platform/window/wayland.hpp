@@ -10,6 +10,11 @@
 
 namespace maicord {
 
+// Associate an exported universal menu with this native Wayland surface.
+bool window_wayland_application_menu(Window,const char* service,const char* path) noexcept;
+// Dispatch an edit accelerator with scoped modifiers, without changing physical key state.
+bool window_wayland_edit_command(Window,Key key) noexcept;
+
 struct WaylandSurfaceInfo {
     void* display;  // wl_display*: eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND_KHR, display)
     void* surface;  // wl_surface*, the same as window_surface_native
