@@ -60,6 +60,14 @@ MaiCord's own subdirectory remains inside that namespace, for example
 The launcher never reads another client's tokens. No account credentials or
 message contents are included in validation artifacts.
 
+Wallet requests use a persistent private D-Bus connection, serialized across
+threads and separate from the UI's desktop-service connection. Each operation
+opens a fresh Secret Service session bound to the provider that replied, so
+caller approval survives repeated operations while provider restarts do not
+reuse stale sessions. Reading/storing allows Dome Wallet's three-minute access
+dialog to finish; routine calls retain their short deadlines. Locked-wallet
+unlock prompts are still reported as locked without invoking a prompt.
+
 ## Bitmap-only text
 
 The fork rejects fonts containing `glyf`, `CFF `, `CFF2` or `COLR` tables, including
@@ -95,6 +103,13 @@ Upstream's self-updater is disabled in `dome/build.sh` so it cannot replace this
 fork. The signed plugin catalog and its verification are retained.
 
 ## Validation
+
+The private-bus `maicord_dbus_services` regression verifies caller reuse across
+lookups/stores and worker threads, access approval taking longer than four
+seconds, and reconnecting with a new Secret Service session. Together with
+`maicord_dbus_secure_buffer`, it passes against the mock provider and a bare
+private bus. These tests require the private-bus harness; normal test runs skip
+them to avoid accessing the user's wallet.
 
 `bash dome/build.sh --test` selects the supported bitmap and plugin contracts by
 default. The legacy upstream suite assumes outline-font support and is not this

@@ -9,7 +9,7 @@
 // open-uri, portal probes) make their calls and subscriptions on it. A connection that ends is dropped and, when someone
 // still wants a bus, opened again after a pause; the open hooks then re-establish each service's subscriptions.
 //
-// Not thread-safe: every function here belongs to the UI thread. (secret_service.hpp opens connections of its own and
+// Not thread-safe: every function here belongs to the UI thread. (secret_service.hpp owns a separate serialized connection and
 // may be called from any thread.)
 
 namespace maicord::dbus {

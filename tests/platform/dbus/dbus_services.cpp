@@ -1,5 +1,6 @@
 #include "maicord/core/memory.hpp"
 #include "maicord/core/time.hpp"
+#include "maicord/os/thread.hpp"
 #include "maicord/platform/dbus/connection.hpp"
 #include "maicord/platform/dbus/desktop_settings.hpp"
 #include "maicord/platform/dbus/notifications.hpp"
@@ -780,6 +781,14 @@ void test_open_uri_portal() noexcept {
 
 // The Secret Service ------------------------------------------------------------------------------------------------------
 
+u32 secret_lookup_worker(void* expected) noexcept {
+    const SecretAttribute attributes[2] = {{"application", "maicord"}, {"purpose", "test-key"}};
+    u8 secret[32];
+    u32 length = 0;
+    return secret_lookup(attributes, 2, secret, sizeof(secret), &length) == SecretStatus::ok &&
+                   length == 32 && bytes_equal(secret, expected, 32) ? 0 : 1;
+}
+
 void test_secrets() noexcept {
     const SecretAttribute attributes[2] = {{"application", "maicord"}, {"purpose", "test-key"}};
     u8 secret[64];
@@ -794,6 +803,11 @@ void test_secrets() noexcept {
     take_log();
     expect_line("OpenSession", "OpenSession s:plain v(s:)", "OpenSession asks for the plain algorithm");
     expect_line("SearchItems", "SearchItems {s:application=s:maicord,s:purpose=s:test-key}", "SearchItems' attributes");
+    char first_caller[128]{};
+    const char* caller = find_line("SecretCaller ");
+    check(caller && text_length(caller) < sizeof(first_caller), "the mock records the authenticated wallet caller");
+    if (caller && text_length(caller) < sizeof(first_caller))
+        copy_bytes(first_caller, caller, text_length(caller) + 1);
 
     u8 key[32];
     for (u32 i = 0; i < 32; ++i)
@@ -807,12 +821,28 @@ void test_secrets() noexcept {
               contains(created, "replace=1"),
           "CreateItem's label, attributes, value, content type and replace flag");
     check(find_line("ReadAlias default") != nullptr, "the default collection comes from ReadAlias");
+    check(text_equal(find_line("SecretCaller "), first_caller), "lookup and store share one wallet bus connection");
+
+    Builder delay;
+    builder_init(&delay);
+    builder_string(&delay, "secret-access-delay");
+    builder_bool(&delay, true);
+    control("SetMode", &delay);
+    builder_release(&delay);
 
     check(secret_lookup(attributes, 2, secret, sizeof(secret), &length) == SecretStatus::ok && length == 32 &&
               bytes_equal(secret, key, 32),
           "the stored secret reads back");
     take_log();
+    check(text_equal(find_line("SecretCaller "), first_caller), "approval longer than four seconds keeps the same caller");
     check(find_line("GetSecret /org/freedesktop/secrets/collection/login/") != nullptr, "GetSecret on the item");
+
+    secret_service_disconnect();
+    check(secret_lookup(attributes, 2, secret, sizeof(secret), &length) == SecretStatus::ok && length == 32 &&
+              bytes_equal(secret, key, 32), "the private wallet connection can reconnect and reopen its Secret Service session");
+    take_log();
+    check(find_line("SecretCaller ") && !text_equal(find_line("SecretCaller "), first_caller),
+          "disconnect replaces the wallet caller rather than reusing a stale connection");
 
     u8 key2[32];
     for (u32 i = 0; i < 32; ++i)
@@ -821,6 +851,26 @@ void test_secrets() noexcept {
               secret_lookup(attributes, 2, secret, sizeof(secret), &length) == SecretStatus::ok && length == 32 &&
               bytes_equal(secret, key2, 32),
           "storing again replaces the secret");
+
+    take_log();
+    Thread* workers[2]{};
+    for (u32 i = 0; i < 2; ++i)
+        workers[i] = thread_start(secret_lookup_worker, key2, 256 * 1024, nullptr);
+    for (u32 i = 0; i < 2; ++i) {
+        u32 code = 1;
+        check(workers[i] && thread_wait(workers[i], 10000) && thread_exit_code(workers[i], &code) && code == 0,
+              "concurrent wallet lookups serialize their private connection");
+        thread_close(workers[i]);
+    }
+    take_log();
+    const char* worker_caller = find_line("SecretCaller ");
+    u32 worker_calls = 0;
+    for (u32 i = 0; i < g_line_count; ++i)
+        if (starts_with(g_lines[i], "SecretCaller ")) {
+            ++worker_calls;
+            check(text_equal(g_lines[i], worker_caller), "worker threads use the same wallet caller identity");
+        }
+    check(worker_calls == 2, "both worker lookups reached the service");
 
     u8 small[8];
     check(secret_lookup(attributes, 2, small, sizeof(small), &length) == SecretStatus::failed && length == 32,
@@ -875,6 +925,7 @@ void test_secrets() noexcept {
               secret_erase(attributes, 2) == SecretStatus::not_found,
           "the item is gone, and a second erase finds nothing");
     secret_erase(big, 1);
+    secret_service_disconnect();
 }
 
 // Portal probes -----------------------------------------------------------------------------------------------------------

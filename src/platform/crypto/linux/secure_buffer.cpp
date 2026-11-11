@@ -25,6 +25,7 @@
 #include "maicord/core/memory.hpp"
 #include "maicord/platform/dbus/secret_service.hpp"
 #include "maicord/core/scratch_pages.hpp"
+#include "maicord/os/linux/srwlock.hpp"
 #include "maicord/sys/linux/calls.hpp"
 #include "maicord/sys/linux/path.hpp"
 #include "maicord/sys/linux/process.hpp"
@@ -227,7 +228,7 @@ bool file_master_key(u8 (&key)[32], u32* native_error, bool create) noexcept {
 // The Secret Service.
 
 constexpr const char* kServiceKeyLabel = "MaiCord master key";
-volatile u32 g_service_lock;
+SRWLOCK g_service_lock;
 volatile u32 g_service_noted;
 
 // MAICORD_SECRET_SERVICE=off keeps the key in the file (the tests, and a user who wants no keyring).
@@ -317,10 +318,11 @@ ServiceKey service_master_key(u8 (&key)[32], u32* native_error, bool create) noe
 
 // The master key: the Secret Service's when there is one, else the key file's.
 bool master_key(u8 (&key)[32], u32* native_error, bool create) noexcept {
-    while (__atomic_exchange_n(&g_service_lock, 1u, __ATOMIC_ACQUIRE))
-        syscall1(24 /* sched_yield */, 0);
+    // Another thread may be waiting for a human to approve wallet access.
+    // Sleep on the lock rather than spinning for the dialog's lifetime.
+    AcquireSRWLockExclusive(&g_service_lock);
     const ServiceKey service = service_master_key(key, native_error, create);
-    __atomic_store_n(&g_service_lock, 0u, __ATOMIC_RELEASE);
+    ReleaseSRWLockExclusive(&g_service_lock);
     if (service == ServiceKey::used)
         return true;
     if (service == ServiceKey::missing)

@@ -1,6 +1,7 @@
 #include "maicord/core/log.hpp"
 #include "maicord/core/memory.hpp"
 #include "maicord/core/slice.hpp"
+#include "maicord/os/linux/srwlock.hpp"
 #include "maicord/platform/dbus/connection.hpp"
 #include "maicord/platform/dbus/secret_service.hpp"
 
@@ -15,12 +16,25 @@ constexpr const char* kItemInterface = "org.freedesktop.Secret.Item";
 constexpr const char* kSessionInterface = "org.freedesktop.Secret.Session";
 constexpr const char* kDefaultAlias = "/org/freedesktop/secrets/aliases/default";
 constexpr u32 kCallTimeoutMs = 4000;
+// Dome Wallet may ask for caller approval inside GetSecret/CreateItem. Allow
+// its three-minute native dialog deadline plus time to return the result.
+constexpr u32 kAccessTimeoutMs = 190000;
 constexpr u32 kPathCapacity = 192;
 constexpr u32 kMaxItems = 8;
 
 struct Client {
     Connection* connection;
     char session[kPathCapacity];
+    char service[kPathCapacity];
+    bool discard;
+};
+
+SRWLOCK g_secret_lock;
+Connection* g_secret_connection;
+
+struct SecretLock {
+    SecretLock() noexcept { AcquireSRWLockExclusive(&g_secret_lock); }
+    ~SecretLock() noexcept { ReleaseSRWLockExclusive(&g_secret_lock); }
 };
 
 SecretStatus classify(const Message& reply) noexcept {
@@ -37,14 +51,18 @@ SecretStatus classify(const Message& reply) noexcept {
 
 // A call whose reply is the method return: false with *status set otherwise. On true the caller releases `reply`.
 bool call(Client* client, const CallTarget& target, const Builder* body, Message* reply, SecretStatus* status) noexcept {
-    const Status result = connection_call_sync(client->connection, target, body, kCallTimeoutMs, reply);
+    const bool access = c_string_equal(target.member, "GetSecret") || c_string_equal(target.member, "CreateItem");
+    const Status result = connection_call_sync(client->connection, target, body,
+                                               access ? kAccessTimeoutMs : kCallTimeoutMs, reply);
     if (result == Status::ok)
         return true;
     if (result == Status::error_reply) {
         *status = classify(*reply);
         message_release(reply);
     } else {
-        *status = result == Status::failed ? SecretStatus::failed : SecretStatus::unavailable;
+        *status = result == Status::failed && connection_alive(client->connection)
+                      ? SecretStatus::failed : SecretStatus::unavailable;
+        client->discard = true;
     }
     return false;
 }
@@ -57,7 +75,14 @@ bool copy_path(const char* path, u32 length, char* out) noexcept {
 }
 
 bool open_client(Client* client, SecretStatus* status) noexcept {
-    client->connection = connection_open_session();
+    if (g_secret_connection && !connection_alive(g_secret_connection)) {
+        connection_close(g_secret_connection);
+        g_secret_connection = nullptr;
+    }
+    const bool reused = g_secret_connection != nullptr;
+    if (!g_secret_connection)
+        g_secret_connection = connection_open_session();
+    client->connection = g_secret_connection;
     if (!client->connection) {
         *status = SecretStatus::unavailable;
         return false;
@@ -74,7 +99,15 @@ bool open_client(Client* client, SecretStatus* status) noexcept {
     builder_release(&body);
     if (!ok) {
         connection_close(client->connection);
+        g_secret_connection = nullptr;
         client->connection = nullptr;
+        // An idle socket can look live until the first read/write discovers a
+        // bus disconnect. Retry opening a session once on a fresh connection;
+        // no read/store/delete operation has been sent yet.
+        if (reused && *status == SecretStatus::unavailable) {
+            client->discard = false;
+            return open_client(client, status);
+        }
         return false;
     }
     // (v output, o session)
@@ -82,11 +115,16 @@ bool open_client(Client* client, SecretStatus* status) noexcept {
     message_reader(reply, &r);
     const char* path = nullptr;
     u32 length = 0;
-    const bool parsed = reader_skip(&r) && reader_string(&r, &path, &length) && copy_path(path, length, client->session);
+    // Pin this Secret Service session to the provider that opened it. A provider
+    // restart between calls must not send a secret to a replacement owner.
+    const bool parsed = reply.sender && reply.sender[0] == ':' &&
+                        copy_path(reply.sender, c_string_length(reply.sender), client->service) &&
+                        reader_skip(&r) && reader_string(&r, &path, &length) && copy_path(path, length, client->session);
     message_release(&reply);
     if (!parsed) {
         *status = SecretStatus::failed;
         connection_close(client->connection);
+        g_secret_connection = nullptr;
         client->connection = nullptr;
         return false;
     }
@@ -96,9 +134,13 @@ bool open_client(Client* client, SecretStatus* status) noexcept {
 void close_client(Client* client) noexcept {
     if (!client->connection)
         return;
-    const CallTarget target{kService, client->session, kSessionInterface, "Close"};
-    connection_call(client->connection, target, nullptr, 0, nullptr, nullptr);
-    connection_close(client->connection);
+    const CallTarget target{client->service, client->session, kSessionInterface, "Close"};
+    if (!client->discard)
+        connection_call(client->connection, target, nullptr, 0, nullptr, nullptr);
+    if (client->discard || !connection_alive(client->connection)) {
+        connection_close(client->connection);
+        g_secret_connection = nullptr;
+    }
     client->connection = nullptr;
 }
 
@@ -146,7 +188,7 @@ bool unlock_paths(Client* client, const char (*paths)[kPathCapacity], u32 count,
     builder_close_array(&body);
     Message reply;
     SecretStatus ignored = SecretStatus::failed;
-    const CallTarget target{kService, kServicePath, kServiceInterface, "Unlock"};
+    const CallTarget target{client->service, kServicePath, kServiceInterface, "Unlock"};
     const bool ok = call(client, target, &body, &reply, &ignored);
     builder_release(&body);
     if (!ok)
@@ -181,7 +223,7 @@ SecretStatus search(Client* client, const SecretAttribute* attributes, u32 count
     append_attributes(&body, attributes, count);
     Message reply;
     SecretStatus status = SecretStatus::failed;
-    const CallTarget target{kService, kServicePath, kServiceInterface, "SearchItems"};
+    const CallTarget target{client->service, kServicePath, kServiceInterface, "SearchItems"};
     const bool ok = call(client, target, &body, &reply, &status);
     builder_release(&body);
     if (!ok)
@@ -215,6 +257,7 @@ const char* secret_status_name(SecretStatus status) noexcept {
 }
 
 SecretStatus secret_lookup(const SecretAttribute* attributes, u32 count, u8* secret, u32 capacity, u32* length) noexcept {
+    SecretLock lock;
     *length = 0;
     Client client{};
     SecretStatus status = SecretStatus::failed;
@@ -230,7 +273,7 @@ SecretStatus secret_lookup(const SecretAttribute* attributes, u32 count, u8* sec
             builder_init(&body);
             builder_object_path(&body, client.session);
             Message reply;
-            const CallTarget target{kService, found.unlocked[0], kItemInterface, "GetSecret"};
+            const CallTarget target{client.service, found.unlocked[0], kItemInterface, "GetSecret"};
             if (call(&client, target, &body, &reply, &status)) {
                 // (o session, ay parameters, ay value, s content_type)
                 Reader r;
@@ -264,6 +307,7 @@ SecretStatus secret_lookup(const SecretAttribute* attributes, u32 count, u8* sec
 
 SecretStatus secret_store(const char* label, const SecretAttribute* attributes, u32 count, const u8* secret,
                           u32 length) noexcept {
+    SecretLock lock;
     Client client{};
     SecretStatus status = SecretStatus::failed;
     if (!open_client(&client, &status))
@@ -275,7 +319,7 @@ SecretStatus secret_store(const char* label, const SecretAttribute* attributes, 
         builder_init(&body);
         builder_string(&body, "default");
         Message reply;
-        const CallTarget target{kService, kServicePath, kServiceInterface, "ReadAlias"};
+        const CallTarget target{client.service, kServicePath, kServiceInterface, "ReadAlias"};
         copy_bytes(collection, kDefaultAlias, c_string_length(kDefaultAlias) + 1);
         if (call(&client, target, &body, &reply, &status)) {
             Reader r;
@@ -309,7 +353,7 @@ SecretStatus secret_store(const char* label, const SecretAttribute* attributes, 
     builder_close_struct(&body);
     builder_bool(&body, true);  // replace an item with the same attributes
     Message reply;
-    const CallTarget target{kService, collection, kCollectionInterface, "CreateItem"};
+    const CallTarget target{client.service, collection, kCollectionInterface, "CreateItem"};
     // The collection may be locked: (o item, o prompt) with a prompt path and no item (the mock, KWallet), or the error
     // org.freedesktop.Secret.Error.IsLocked (GNOME Keyring). One that needs no password unlocks without a prompt, and then
     // the call is made again.
@@ -338,6 +382,7 @@ SecretStatus secret_store(const char* label, const SecretAttribute* attributes, 
 }
 
 SecretStatus secret_erase(const SecretAttribute* attributes, u32 count) noexcept {
+    SecretLock lock;
     Client client{};
     SecretStatus status = SecretStatus::failed;
     if (!open_client(&client, &status))
@@ -350,7 +395,7 @@ SecretStatus secret_erase(const SecretAttribute* attributes, u32 count) noexcept
         } else {
             for (u32 i = 0; i < found.unlocked_count && status == SecretStatus::ok; ++i) {
                 Message reply;
-                const CallTarget target{kService, found.unlocked[i], kItemInterface, "Delete"};
+                const CallTarget target{client.service, found.unlocked[i], kItemInterface, "Delete"};
                 if (call(&client, target, nullptr, &reply, &status))
                     message_release(&reply);
             }
@@ -358,6 +403,12 @@ SecretStatus secret_erase(const SecretAttribute* attributes, u32 count) noexcept
     }
     close_client(&client);
     return status;
+}
+
+void secret_service_disconnect() noexcept {
+    SecretLock lock;
+    connection_close(g_secret_connection);
+    g_secret_connection = nullptr;
 }
 
 } // namespace maicord::dbus

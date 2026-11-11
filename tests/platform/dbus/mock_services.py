@@ -15,6 +15,7 @@ decoded by libdbus, not by the code under test); the test fetches the lines with
 import os
 import re
 import sys
+import time
 
 import dbus
 import dbus.lowlevel
@@ -515,6 +516,8 @@ class Item(dbus.service.Object):
     @dbus.service.method('org.freedesktop.Secret.Item', in_signature='o', out_signature='(oayays)', byte_arrays=True)
     def GetSecret(self, session):
         record('GetSecret %s' % self.path)
+        if modes.pop('secret-access-delay', False):
+            time.sleep(4.1)  # A native approval that outlasts the old 4s RPC deadline.
         if state['locked']:
             raise dbus.exceptions.DBusException('locked', name='org.freedesktop.Secret.Error.IsLocked')
         item = items[self.path]
@@ -563,9 +566,10 @@ class SecretService(dbus.service.Object):
     def __init__(self):
         super().__init__(bus, SECRETS)
 
-    @dbus.service.method('org.freedesktop.Secret.Service', in_signature='sv', out_signature='vo')
-    def OpenSession(self, algorithm, argument):
+    @dbus.service.method('org.freedesktop.Secret.Service', in_signature='sv', out_signature='vo', sender_keyword='sender')
+    def OpenSession(self, algorithm, argument, sender=None):
         record('OpenSession %s %s' % (canon(algorithm), canon(argument)))
+        record('SecretCaller %s' % sender)
         if str(algorithm) != 'plain':
             raise dbus.exceptions.DBusException('unsupported', name='org.freedesktop.DBus.Error.NotSupported')
         state['sessions'] += 1

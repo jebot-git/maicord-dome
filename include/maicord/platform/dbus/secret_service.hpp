@@ -6,10 +6,12 @@
 // store and erase one secret by its attributes. Used by the platform crypto to keep the at-rest master key out of the
 // data directory.
 //
-// Each call opens a private connection to the session bus, makes its calls there and closes it, so any thread may call
-// them and nothing is shared with the UI loop. The session is the "plain" algorithm (secrets cross the bus
+// Calls serialize access to a persistent private bus connection, separate from the UI loop. Each operation opens and
+// closes its own Secret Service session, preserving bus caller approval between operations and reopening sessions after
+// provider restarts. Any thread may call these functions. The session is the "plain" algorithm (secrets cross the bus
 // unencrypted, which the bus's peer-uid check protects); a keyring that is locked and would need a prompt is reported as
-// `locked` (nothing is prompted). The buffers that held a secret are wiped before they are freed.
+// `locked` (no unlock prompt is invoked). A provider may request application access approval while reading/storing an
+// unlocked wallet; those calls allow its native dialog time to complete. Secret buffers are wiped before being freed.
 
 namespace maicord::dbus {
 
@@ -38,5 +40,8 @@ SecretStatus secret_store(const char* label, const SecretAttribute* attributes, 
 
 // Deletes the items whose attributes include all of `attributes`. not_found when there were none.
 SecretStatus secret_erase(const SecretAttribute* attributes, u32 count) noexcept;
+
+// Releases the private connection (shutdown/tests). The next operation reconnects.
+void secret_service_disconnect() noexcept;
 
 } // namespace maicord::dbus
